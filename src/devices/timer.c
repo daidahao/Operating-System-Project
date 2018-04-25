@@ -7,6 +7,9 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+
+/* For time_sleep() */
+#include <stdbool.h>
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -30,6 +33,58 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+/* For time_sleep() */
+static bool sleep_less (const struct list_elem *a, const struct list_elem *b, void *aux);
+static int64_t get_wakeup_tick (const struct list_elem *e);
+static void wakeup (void *);
+
+static struct list sleep_list;
+static struct lock sleep_list_lock;
+static int64_t next_wakeup_tick;
+static struct semaphore sleep_sema;
+
+/* Wake up the next thread */
+static
+void wakeup (void * v UNUSED)
+{
+  while (1)
+  {
+    sema_down (&sleep_sema);
+    sema_up (&sleep_sema);
+
+    int64_t now = timer_ticks ();
+    struct list_elem *e;
+    lock_acquire (&sleep_list_lock);
+    // Modify the list
+    for (e = list_begin (&sleep_list); e != list_end (&sleep_list);
+          )
+    {
+      if (get_wakeup_tick (e) <= now)
+      {
+        // printf ("Found 1 to wake up.\n");
+        struct thread *t = list_entry (e, struct thread, sleep_elem);
+        thread_unblock (t);
+        e = list_remove (e);
+      }
+      else
+      {
+        break;
+      }
+    }
+    if (list_empty (&sleep_list))
+    {
+      next_wakeup_tick = INT64_MAX;
+    }
+    else
+    {
+      next_wakeup_tick = get_wakeup_tick (list_front (&sleep_list));
+    }
+    lock_release (&sleep_list_lock);
+    sema_down (&sleep_sema);
+  }
+
+}
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -37,6 +92,50 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+
+  /* For time_sleep() */
+  list_init (&sleep_list);
+  lock_init (&sleep_list_lock);
+  next_wakeup_tick = INT64_MAX;
+  sema_init (&sleep_sema, 0);
+  thread_create ("WAKEUP", PRI_DEFAULT, wakeup, NULL);
+}
+
+/* Sleeps for approximately TICKS timer ticks.  Interrupts must
+   be turned on. */
+void
+timer_sleep (int64_t ticks) 
+{
+  int64_t start = timer_ticks ();
+
+  ASSERT (intr_get_level () == INTR_ON);
+  // while (timer_elapsed (start) < ticks) 
+  //   thread_yield ();
+
+  struct thread* current_thread = thread_current ();
+  current_thread->wakeup_tick = start + ticks;
+
+  lock_acquire (&sleep_list_lock);
+  list_insert_ordered (&sleep_list, &(current_thread->sleep_elem), sleep_less, NULL);
+  next_wakeup_tick = get_wakeup_tick(list_front(&sleep_list));
+  lock_release (&sleep_list_lock);
+
+  intr_disable ();
+  thread_block ();
+  intr_enable ();
+}
+
+/* Timer interrupt handler. */
+static void
+timer_interrupt (struct intr_frame *args UNUSED)
+{
+  ticks++;
+  thread_tick ();
+  if (ticks >= next_wakeup_tick && sleep_sema.value==0)
+  {
+    sema_up (&sleep_sema);
+    // printf("<2> sleep_sema = %d\n", sleep_sema.value);
+  }
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -84,16 +183,18 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. */
-void
-timer_sleep (int64_t ticks) 
+int64_t
+get_wakeup_tick (const struct list_elem *e) 
 {
-  int64_t start = timer_ticks ();
+  return list_entry (e, struct thread, sleep_elem)->wakeup_tick;
+}
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+bool
+sleep_less (const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux UNUSED) 
+{
+  return (get_wakeup_tick (a) < get_wakeup_tick (b));
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -164,14 +265,6 @@ void
 timer_print_stats (void) 
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
-}
-
-/* Timer interrupt handler. */
-static void
-timer_interrupt (struct intr_frame *args UNUSED)
-{
-  ticks++;
-  thread_tick ();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
