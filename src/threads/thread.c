@@ -51,6 +51,7 @@ static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
 
 /* Scheduling. */
+#define max(a, b) ((a)>(b)?(a):(b))
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
@@ -129,6 +130,8 @@ thread_tick (void)
     if (t->name[len - 1] >= '0' && t->name[len - 1] <= '9')
         printf ("(%c%c,%d) ", t->name[len - 2], t->name[len - 1], t->priority);
     //things to help us testing your program  ***   !!!
+    // show (last_2char_of_name, priority)
+    // thread->name is like "priority xx", which xx is a number.
     
   /* Update statistics. */
   if (t == idle_thread)
@@ -141,8 +144,12 @@ thread_tick (void)
     kernel_ticks++;
 
   /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
-    intr_yield_on_return ();
+  if (++thread_ticks >= thread_get_time_slice())
+  {
+    ASSERT (intr_get_level () == INTR_OFF);
+    thread_set_priority(max(thread_get_priority() - 3, 0));
+    intr_yield_on_return();
+  }
 }
 
 /* Prints thread statistics. */
@@ -341,7 +348,9 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  thread_current()->priority = new_priority;
+  if (new_priority < list_entry(list_head(&ready_list), struct thread, elem)->priority)
+    thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -349,6 +358,12 @@ int
 thread_get_priority (void) 
 {
   return thread_current ()->priority;
+}
+
+int
+thread_get_time_slice (void) 
+{
+  return thread_current ()->time_slice;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -468,6 +483,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->time_slice = (priority % 7) + 2;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
