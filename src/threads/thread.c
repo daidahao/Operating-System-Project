@@ -169,7 +169,7 @@ thread_cmp_by_priority (const struct list_elem *a, const struct list_elem *b, vo
   bool flag_str = strcmp(list_entry(a, struct thread, elem)->name, list_entry(b, struct thread, elem)->name);
   if (true == flag)
     return true;
-  else if (true == flag_eql && flag_str > 0)
+  else if (true == flag_eql && flag_str < 0)
     return true;
   else
     return false;
