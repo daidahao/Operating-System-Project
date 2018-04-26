@@ -43,9 +43,10 @@ static struct lock sleep_list_lock;
 static int64_t next_wakeup_tick;
 static struct semaphore sleep_sema;
 
-/* Wake up the next thread */
-static
-void wakeup (void * v UNUSED)
+/* WAKEUP thread for time_sleep().
+   Wake up the next thread */
+static void
+wakeup (void * v UNUSED)
 {
   while (1)
   {
@@ -85,6 +86,16 @@ void wakeup (void * v UNUSED)
 
 }
 
+/* Compare function for linked list. 
+   See "lib/kernel/list.h" for more details. */
+bool
+sleep_less (const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux UNUSED) 
+{
+  return (get_wakeup_tick (a) < get_wakeup_tick (b));
+}
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -111,6 +122,9 @@ timer_sleep (int64_t ticks)
   ASSERT (intr_get_level () == INTR_ON);
   // while (timer_elapsed (start) < ticks) 
   //   thread_yield ();
+
+  if (ticks <= 0)
+    return;
 
   struct thread* current_thread = thread_current ();
   current_thread->wakeup_tick = start + ticks;
@@ -187,14 +201,6 @@ int64_t
 get_wakeup_tick (const struct list_elem *e) 
 {
   return list_entry (e, struct thread, sleep_elem)->wakeup_tick;
-}
-
-bool
-sleep_less (const struct list_elem *a,
-                             const struct list_elem *b,
-                             void *aux UNUSED) 
-{
-  return (get_wakeup_tick (a) < get_wakeup_tick (b));
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
