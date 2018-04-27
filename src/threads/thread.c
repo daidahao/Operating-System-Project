@@ -72,6 +72,68 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+/* Task 3 */
+
+void 
+set_blocked_lock (struct lock *b_lock)
+{
+  thread_current ()->blocked_lock = b_lock;
+}
+
+void 
+donate_priority (struct lock *lock)
+{
+  if (lock == NULL)
+    return;
+
+  int priority_cur = thread_get_priority ();
+
+  enum intr_level old_level = intr_disable ();
+  struct thread *donee = lock->holder;
+  if (donee == NULL)
+  {
+    intr_set_level (old_level);
+    return;
+  }
+  if (donee->priority < priority_cur)
+  {
+    if (lock->prev_priority == LOCK_INIT_PREV_PRIORITY)
+      lock->prev_priority = donee->priority;
+    donee->priority = priority_cur;
+    if (donee->status == THREAD_READY)
+    {
+      // Perhaps list_remove () && list_insert_ordered () is more efficient
+      // list_sort (&ready_list, thread_cmp_by_priority, NULL);
+      list_remove (&donee->elem);
+      list_insert_ordered (&ready_list, &donee->elem, &thread_cmp_by_priority, NULL);
+    }
+    else if (donee->status == THREAD_BLOCKED)
+      donate_priority (donee->blocked_lock);
+  }
+  intr_set_level (old_level);
+  printf ("(1) donate successfully!\n");
+}
+
+void
+undo_donate_priority (struct lock *lock)
+{
+  enum intr_level old_level = intr_disable ();
+
+  if (lock->prev_priority == LOCK_INIT_PREV_PRIORITY)
+  {
+    intr_set_level (old_level);
+    return;
+  }
+  if (thread_get_priority () > lock->prev_priority)
+    // thread_set_priority (lock->prev_priority);
+    thread_current ()->priority = lock->prev_priority;
+  lock->prev_priority = LOCK_INIT_PREV_PRIORITY;
+
+  intr_set_level (old_level);
+  printf ("current thread = %s\n", thread_current ()->name);
+  printf ("(1) undo successfully!\n");
+}
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -375,7 +437,7 @@ thread_get_priority (void)
   return thread_current ()->priority;
 }
 
-int
+unsigned
 thread_get_time_slice (void) 
 {
   return thread_current ()->time_slice;
@@ -500,6 +562,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->time_slice = (priority % 7) + 2;
   t->magic = THREAD_MAGIC;
+  t->blocked_lock = NULL;
 
   old_level = intr_disable ();
   list_insert_ordered(&all_list, &t->allelem, &thread_cmp_by_priority, NULL);

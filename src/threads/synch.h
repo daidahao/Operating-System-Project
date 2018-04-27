@@ -1,6 +1,8 @@
 #ifndef THREADS_SYNCH_H
 #define THREADS_SYNCH_H
 
+#define LOCK_INIT_PREV_PRIORITY -20
+
 #include <list.h>
 #include <stdbool.h>
 
@@ -22,6 +24,9 @@ struct lock
   {
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
+
+    /* Task 3 */
+    int prev_priority;
   };
 
 void lock_init (struct lock *);

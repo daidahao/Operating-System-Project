@@ -178,6 +178,7 @@ lock_init (struct lock *lock)
   ASSERT (lock != NULL);
 
   lock->holder = NULL;
+  lock->prev_priority = LOCK_INIT_PREV_PRIORITY;
   sema_init (&lock->semaphore, 1);
 }
 
@@ -196,7 +197,12 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  donate_priority (lock);
+  set_blocked_lock (lock);
+
   sema_down (&lock->semaphore);
+
+  set_blocked_lock (NULL);
   lock->holder = thread_current ();
 }
 
@@ -232,6 +238,7 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   lock->holder = NULL;
+  undo_donate_priority (lock);
   sema_up (&lock->semaphore);
 }
 
