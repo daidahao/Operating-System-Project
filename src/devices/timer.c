@@ -53,6 +53,8 @@ wakeup (void * v UNUSED)
     sema_down (&sleep_sema);
     sema_up (&sleep_sema);
 
+    thread_set_priority (PRI_MAX);
+
     int64_t now = timer_ticks ();
     struct list_elem *e;
     lock_acquire (&sleep_list_lock);
@@ -64,6 +66,8 @@ wakeup (void * v UNUSED)
       {
         // printf ("Found 1 to wake up.\n");
         struct thread *t = list_entry (e, struct thread, sleep_elem);
+        if (t->status != THREAD_BLOCKED)
+          break;
         thread_unblock (t);
         e = list_remove (e);
       }
@@ -109,7 +113,7 @@ timer_init (void)
   lock_init (&sleep_list_lock);
   next_wakeup_tick = INT64_MAX;
   sema_init (&sleep_sema, 0);
-  thread_create ("WAKEUP", PRI_DEFAULT, wakeup, NULL);
+  thread_create ("WAKEUP", PRI_MAX, wakeup, NULL);
 }
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
@@ -144,7 +148,6 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick ();
   if (ticks >= next_wakeup_tick && sleep_sema.value==0)
   {
     sema_up (&sleep_sema);

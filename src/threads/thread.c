@@ -102,9 +102,9 @@ donate_priority (struct lock *lock)
     if (donee->status == THREAD_READY)
     {
       // Perhaps list_remove () && list_insert_ordered () is more efficient
-      // list_sort (&ready_list, thread_cmp_by_priority, NULL);
-      list_remove (&donee->elem);
-      list_insert_ordered (&ready_list, &donee->elem, &thread_cmp_by_priority, NULL);
+      list_sort (&ready_list, &thread_cmp_by_priority, NULL);
+      // list_remove (&donee->elem);
+      // list_insert_ordered (&ready_list, &donee->elem, &thread_cmp_by_priority, NULL);
     }
     else if (donee->status == THREAD_BLOCKED)
     {
@@ -206,10 +206,11 @@ thread_tick (void)
     kernel_ticks++;
 
   /* Enforce preemption. */
-  if (++thread_ticks >= thread_get_time_slice ())
+  // if (++thread_ticks >= thread_get_time_slice ())
+  if (++thread_ticks >= TIME_SLICE)
   {
     ASSERT (intr_get_level () == INTR_OFF);
-    thread_set_priority(max(thread_get_priority () - 3, 0));
+    // thread_set_priority(max(thread_get_priority () - 3, 0));
     intr_yield_on_return();
   }
 }
@@ -290,6 +291,9 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+
+  if (priority > thread_get_priority ())
+    thread_yield ();
 
   return tid;
 }
@@ -426,8 +430,8 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current()->priority = new_priority;
-  // if (new_priority < list_entry(list_head(&ready_list), struct thread, elem)->priority)
-  //   thread_yield();
+  // if (new_priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
+    thread_yield();
 }
 
 /* Returns the current thread's priority. */
