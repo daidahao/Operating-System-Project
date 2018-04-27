@@ -199,10 +199,10 @@ lock_acquire (struct lock *lock)
 
   donate_priority (lock);
   set_blocked_lock (lock);
-
   sema_down (&lock->semaphore);
 
   set_blocked_lock (NULL);
+
   lock->holder = thread_current ();
 }
 

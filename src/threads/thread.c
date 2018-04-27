@@ -87,7 +87,6 @@ donate_priority (struct lock *lock)
     return;
 
   int priority_cur = thread_get_priority ();
-
   enum intr_level old_level = intr_disable ();
   struct thread *donee = lock->holder;
   if (donee == NULL)
@@ -108,10 +107,11 @@ donate_priority (struct lock *lock)
       list_insert_ordered (&ready_list, &donee->elem, &thread_cmp_by_priority, NULL);
     }
     else if (donee->status == THREAD_BLOCKED)
+    {
       donate_priority (donee->blocked_lock);
+    }
   }
   intr_set_level (old_level);
-  printf ("(1) donate successfully!\n");
 }
 
 void
@@ -124,14 +124,12 @@ undo_donate_priority (struct lock *lock)
     intr_set_level (old_level);
     return;
   }
-  if (thread_get_priority () > lock->prev_priority)
+  if (thread_current ()->priority > lock->prev_priority)
     // thread_set_priority (lock->prev_priority);
     thread_current ()->priority = lock->prev_priority;
   lock->prev_priority = LOCK_INIT_PREV_PRIORITY;
 
   intr_set_level (old_level);
-  printf ("current thread = %s\n", thread_current ()->name);
-  printf ("(1) undo successfully!\n");
 }
 
 /* Initializes the threading system by transforming the code
@@ -187,6 +185,7 @@ thread_tick (void)
 {
   struct thread *t = thread_current ();
 
+    
     // don't change the following 3 lines  *********   !!!
     int len = strlen (t-> name);
     if (t->name[len - 1] >= '0' && t->name[len - 1] <= '9')
@@ -195,6 +194,7 @@ thread_tick (void)
     // show (last_2char_of_name, priority)
     // thread->name is like "priority xx", which xx is a number.
     
+
   /* Update statistics. */
   if (t == idle_thread)
     idle_ticks++;
@@ -206,10 +206,10 @@ thread_tick (void)
     kernel_ticks++;
 
   /* Enforce preemption. */
-  if (++thread_ticks >= thread_get_time_slice())
+  if (++thread_ticks >= thread_get_time_slice ())
   {
     ASSERT (intr_get_level () == INTR_OFF);
-    thread_set_priority(max(thread_get_priority() - 3, 0));
+    thread_set_priority(max(thread_get_priority () - 3, 0));
     intr_yield_on_return();
   }
 }
@@ -426,8 +426,8 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current()->priority = new_priority;
-  if (new_priority < list_entry(list_head(&ready_list), struct thread, elem)->priority)
-    thread_yield();
+  // if (new_priority < list_entry(list_head(&ready_list), struct thread, elem)->priority)
+  //   thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -435,6 +435,7 @@ int
 thread_get_priority (void) 
 {
   return thread_current ()->priority;
+
 }
 
 unsigned
@@ -565,7 +566,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->blocked_lock = NULL;
 
   old_level = intr_disable ();
-  list_insert_ordered(&all_list, &t->allelem, &thread_cmp_by_priority, NULL);
+  list_push_back (&all_list, &t->allelem);
+  // list_insert_ordered(&all_list, &t->allelem, &thread_cmp_by_priority, NULL);
   intr_set_level (old_level);
 }
 
