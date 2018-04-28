@@ -102,6 +102,7 @@ struct thread
 
     /* Task 3 */
     struct lock *blocked_lock;
+    struct list donations;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

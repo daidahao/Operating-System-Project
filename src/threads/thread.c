@@ -102,9 +102,9 @@ donate_priority (struct lock *lock)
     if (donee->status == THREAD_READY)
     {
       // Perhaps list_remove () && list_insert_ordered () is more efficient
-      list_sort (&ready_list, &thread_cmp_by_priority, NULL);
-      // list_remove (&donee->elem);
-      // list_insert_ordered (&ready_list, &donee->elem, &thread_cmp_by_priority, NULL);
+      // list_sort (&ready_list, &thread_cmp_by_priority, NULL);
+      list_remove (&donee->elem);
+      list_insert_ordered (&ready_list, &donee->elem, &thread_cmp_by_priority, NULL);
     }
     else if (donee->status == THREAD_BLOCKED)
     {
@@ -185,7 +185,7 @@ thread_tick (void)
 {
   struct thread *t = thread_current ();
 
-    
+    /*
     // don't change the following 3 lines  *********   !!!
     int len = strlen (t-> name);
     if (t->name[len - 1] >= '0' && t->name[len - 1] <= '9')
@@ -193,7 +193,7 @@ thread_tick (void)
     //things to help us testing your program  ***   !!!
     // show (last_2char_of_name, priority)
     // thread->name is like "priority xx", which xx is a number.
-    
+    */
 
   /* Update statistics. */
   if (t == idle_thread)
@@ -208,6 +208,7 @@ thread_tick (void)
   /* Enforce preemption. */
   // if (++thread_ticks >= thread_get_time_slice ())
   if (++thread_ticks >= TIME_SLICE)
+  // if (++thread_ticks)
   {
     ASSERT (intr_get_level () == INTR_OFF);
     // thread_set_priority(max(thread_get_priority () - 3, 0));

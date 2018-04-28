@@ -148,6 +148,7 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+  thread_tick ();
   if (ticks >= next_wakeup_tick && sleep_sema.value==0)
   {
     sema_up (&sleep_sema);
