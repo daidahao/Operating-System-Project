@@ -32,6 +32,36 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+/* One semaphore in a list. */
+struct semaphore_elem 
+  {
+    struct list_elem elem;              /* List element. */
+    struct semaphore semaphore;         /* This semaphore. */
+
+    /* Task 3 */
+    struct thread *thread;
+  };
+
+/* Task 3 */
+bool donation_cmp (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  // Highest donation comes first.
+  return get_donation (a) > get_donation (b);
+}
+
+int get_donation (const struct list_elem *elem)
+{
+  return list_entry (elem, struct lock, don_elem)->donation;
+}
+
+bool waiter_cmp (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  // Highest priority comes first.
+  struct thread *thread_a = list_entry (a, struct semaphore_elem, elem)->thread;
+  struct thread *thread_b = list_entry (b, struct semaphore_elem, elem)->thread;
+  return priority_cmp (thread_a, thread_b);
+}
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -197,7 +227,8 @@ lock_init (struct lock *lock)
   ASSERT (lock != NULL);
 
   lock->holder = NULL;
-  lock->prev_priority = LOCK_INIT_PREV_PRIORITY;
+  lock->donation = LOCK_INIT_DONATION;
+  // lock->prev_priority = LOCK_INIT_PREV_PRIORITY;
   sema_init (&lock->semaphore, 1);
 }
 
@@ -256,8 +287,8 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
-  lock->holder = NULL;
   undo_donate_priority (lock);
+  lock->holder = NULL;
   sema_up (&lock->semaphore);
   // thread_yield ();
 }
@@ -273,12 +304,6 @@ lock_held_by_current_thread (const struct lock *lock)
   return lock->holder == thread_current ();
 }
 
-/* One semaphore in a list. */
-struct semaphore_elem 
-  {
-    struct list_elem elem;              /* List element. */
-    struct semaphore semaphore;         /* This semaphore. */
-  };
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
@@ -322,6 +347,7 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
+  waiter.thread = thread_current ();
   list_push_back (&cond->waiters, &waiter.elem);
   lock_release (lock);
   sema_down (&waiter.semaphore);
@@ -344,8 +370,13 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters)) 
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
-                          struct semaphore_elem, elem)->semaphore);
+  {
+    // sema_up (&list_entry (list_pop_front (&cond->waiters),
+    //                       struct semaphore_elem, elem)->semaphore);
+    struct list_elem *elem = list_min (&cond->waiters, waiter_cmp, NULL);
+    list_remove (elem);
+    sema_up (&list_entry (elem, struct semaphore_elem, elem)->semaphore);
+  }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by

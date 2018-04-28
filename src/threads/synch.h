@@ -2,6 +2,7 @@
 #define THREADS_SYNCH_H
 
 #define LOCK_INIT_PREV_PRIORITY -20
+#define LOCK_INIT_DONATION -20
 
 #include <list.h>
 #include <stdbool.h>
@@ -26,8 +27,15 @@ struct lock
     struct semaphore semaphore; /* Binary semaphore controlling access. */
 
     /* Task 3 */
-    int prev_priority;
+    // int prev_priority;
+    int donation;
+    struct list_elem don_elem;
   };
+
+/* Task 3 */
+bool donation_cmp (const struct list_elem *, const struct list_elem *, void *);
+bool waiter_cmp (const struct list_elem *, const struct list_elem *, void *);
+int get_donation (const struct list_elem *elem);
 
 void lock_init (struct lock *);
 void lock_acquire (struct lock *);

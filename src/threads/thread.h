@@ -103,6 +103,8 @@ struct thread
     /* Task 3 */
     struct lock *blocked_lock;
     struct list donations;
+    int ori_priority;
+    bool donated;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -123,7 +125,6 @@ void thread_start (void);
 
 void thread_tick (void);
 void thread_print_stats (void);
-bool thread_cmp_by_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
@@ -152,6 +153,8 @@ unsigned thread_get_time_slice (void);
 void set_blocked_lock (struct lock *);
 void donate_priority(struct lock *);
 void undo_donate_priority (struct lock *);
+bool thread_cmp_by_priority (const struct list_elem *, const struct list_elem *, void * UNUSED);
+bool priority_cmp (const struct thread *, const struct thread *);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
