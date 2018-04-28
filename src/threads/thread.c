@@ -243,15 +243,18 @@ thread_tick (void)
 {
   struct thread *t = thread_current ();
 
-    /*
+  if (!berkeley_style)
+  {
     // don't change the following 3 lines  *********   !!!
     int len = strlen (t-> name);
     if (t->name[len - 1] >= '0' && t->name[len - 1] <= '9')
         printf ("(%c%c,%d) ", t->name[len - 2], t->name[len - 1], t->priority);
     //things to help us testing your program  ***   !!!
+  }
+
     // show (last_2char_of_name, priority)
     // thread->name is like "priority xx", which xx is a number.
-    */
+    
 
   /* Update statistics. */
   if (t == idle_thread)
@@ -264,14 +267,31 @@ thread_tick (void)
     kernel_ticks++;
 
   /* Enforce preemption. */
-  // if (++thread_ticks >= thread_get_time_slice ())
-  if (++thread_ticks >= TIME_SLICE)
-  // if (++thread_ticks)
+  ++thread_ticks;
+  if (berkeley_style && thread_ticks < TIME_SLICE)
+    return;
+  if (!berkeley_style && thread_ticks < t->time_slice)
+    return;
+
+  /* Otherwise */
+  ASSERT (intr_get_level () == INTR_OFF);
+  if (!berkeley_style)
   {
-    ASSERT (intr_get_level () == INTR_OFF);
+    t->priority = max(t->priority - 3, 0);
+    if (t->priority < list_entry (list_min (&ready_list, &thread_cmp_by_priority, NULL), struct thread, elem)->priority)
+    {
+      intr_yield_on_return();
+      // printf ("min = %s value = %d\n", 
+      // list_entry (list_min (&ready_list, thread_cmp_by_priority, NULL), struct thread, elem)->name,
+      // list_entry (list_min (&ready_list, thread_cmp_by_priority, NULL), struct thread, elem)->priority);
+    }
+    return;
+    // list_remove (&t->elem);
+    // list_insert_ordered (&ready_list, &t->elem, thread_cmp_by_priority, NULL);
     // thread_set_priority(max(thread_get_priority () - 3, 0));
-    intr_yield_on_return();
   }
+  intr_yield_on_return();
+  
 }
 
 /* Prints thread statistics. */
@@ -376,6 +396,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
+  // list_push_back (&ready_list, &t->elem);
   list_insert_ordered(&ready_list, &t->elem, &thread_cmp_by_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -623,14 +644,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
+  t->ori_priority = t->priority = priority;
   t->time_slice = (priority % 7) + 2;
   t->magic = THREAD_MAGIC;
 
   /* Task 3 */
   t->blocked_lock = NULL;
   list_init (&t->donations);
-  t->ori_priority = priority;
   t->donated = false;
 
   old_level = intr_disable ();
@@ -663,7 +683,12 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  {
+    struct list_elem *elem = 
+        list_min (&ready_list, thread_cmp_by_priority, NULL);
+    list_remove (elem);
+    return list_entry (elem, struct thread, elem);
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page

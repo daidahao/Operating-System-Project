@@ -128,6 +128,8 @@ main (void)
 #endif
 
   printf ("Boot complete.\n");
+
+  thread_current ()->priority = PRI_DEFAULT;
   
   /* Run actions specified on kernel command line. */
   run_actions (argv);
@@ -240,6 +242,11 @@ parse_options (char **argv)
         shutdown_configure (SHUTDOWN_POWER_OFF);
       else if (!strcmp (name, "-r"))
         shutdown_configure (SHUTDOWN_REBOOT);
+      else if (!strcmp (name, "-b"))
+      {
+        // Berkeley style
+        berkeley_style = true;
+      }
 #ifdef FILESYS
       else if (!strcmp (name, "-f"))
         format_filesys = true;

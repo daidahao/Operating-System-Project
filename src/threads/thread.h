@@ -120,6 +120,9 @@ struct thread
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
+/* Project 1 */
+bool berkeley_style;
+
 void thread_init (void);
 void thread_start (void);
 
