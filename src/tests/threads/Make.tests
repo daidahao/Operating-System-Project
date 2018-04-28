@@ -40,7 +40,8 @@ tests/threads_SRC += tests/threads/mlfqs-block.c
 tests/threads_SRC += tests/threads/alarm-priority.c
 
 ALARM_PRIORITY_OUTPUTS = 			\
-tests/threads/alarm-wait.output			\
+tests/threads/alarm-single.output		\
+tests/threads/alarm-multiple.output		\
 tests/threads/alarm-simultaneous.output		\
 tests/threads/alarm-priority-old.output		\
 tests/threads/alarm-zero.output			\
