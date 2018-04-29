@@ -124,8 +124,9 @@ donate_priority (struct lock *lock)
     if (lock->donation == LOCK_INIT_DONATION)
     {
       lock->donation = priority_cur;
-      list_insert_ordered 
-          (&donee->donations, &lock->don_elem, donation_cmp, NULL);
+      list_push_back (&donee->donations, &lock->don_elem);
+      // list_insert_ordered 
+      //     (&donee->donations, &lock->don_elem, donation_cmp, NULL);
     }
     else
     {
@@ -142,7 +143,8 @@ donate_priority (struct lock *lock)
       // Perhaps list_remove () && list_insert_ordered () is more efficient
       // list_sort (&ready_list, &thread_cmp_by_priority, NULL);
       list_remove (&donee->elem);
-      list_insert_ordered (&ready_list, &donee->elem, &thread_cmp_by_priority, NULL);
+      list_push_back (&ready_list, &donee->elem);
+      // list_insert_ordered (&ready_list, &donee->elem, &thread_cmp_by_priority, NULL);
     }
     else if (donee->status == THREAD_BLOCKED)
     {
@@ -397,8 +399,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  // list_push_back (&ready_list, &t->elem);
-  list_insert_ordered(&ready_list, &t->elem, &thread_cmp_by_priority, NULL);
+  list_push_back (&ready_list, &t->elem);
+  // list_insert_ordered(&ready_list, &t->elem, &thread_cmp_by_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -469,7 +471,8 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_insert_ordered(&ready_list, &cur->elem, &thread_cmp_by_priority, NULL);
+    list_push_back (&ready_list, &cur->elem);
+    // list_insert_ordered(&ready_list, &cur->elem, &thread_cmp_by_priority, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
