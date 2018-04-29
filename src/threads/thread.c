@@ -280,13 +280,13 @@ thread_tick (void)
   if (!berkeley_style)
   {
     if (t->tid != main_tid)
-      t->priority = max(t->priority - 3, 0);
-    if (t->priority < list_entry (list_min (&ready_list, &thread_cmp_by_priority, NULL), struct thread, elem)->priority)
+      t->ori_priority = t->priority = 
+                max(t->priority - 3, 0);
+    if (t->priority < list_entry (
+      list_min (&ready_list, &thread_cmp_by_priority, NULL), 
+        struct thread, elem)->priority)
     {
       intr_yield_on_return();
-      // printf ("min = %s value = %d\n", 
-      // list_entry (list_min (&ready_list, thread_cmp_by_priority, NULL), struct thread, elem)->name,
-      // list_entry (list_min (&ready_list, thread_cmp_by_priority, NULL), struct thread, elem)->priority);
     }
     return;
     // list_remove (&t->elem);
