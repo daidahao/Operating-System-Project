@@ -122,6 +122,7 @@ extern bool thread_mlfqs;
 
 /* Project 1 */
 bool berkeley_style;
+tid_t main_tid;
 
 void thread_init (void);
 void thread_start (void);

@@ -216,7 +216,7 @@ thread_init (void)
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
-  initial_thread->tid = allocate_tid ();
+  main_tid = (initial_thread->tid = allocate_tid ());
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -277,7 +277,8 @@ thread_tick (void)
   ASSERT (intr_get_level () == INTR_OFF);
   if (!berkeley_style)
   {
-    t->priority = max(t->priority - 3, 0);
+    if (t->tid != main_tid)
+      t->priority = max(t->priority - 3, 0);
     if (t->priority < list_entry (list_min (&ready_list, &thread_cmp_by_priority, NULL), struct thread, elem)->priority)
     {
       intr_yield_on_return();
