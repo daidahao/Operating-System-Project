@@ -128,7 +128,7 @@ main (void)
 #endif
 
   printf ("Boot complete.\n");
-    
+
   /* Run actions specified on kernel command line. */
   run_actions (argv);
 
@@ -242,7 +242,8 @@ parse_options (char **argv)
         shutdown_configure (SHUTDOWN_REBOOT);
       else if (!strcmp (name, "-b"))
       {
-        // Berkeley style
+        /* A new argument -b can specify whether PINTOS run
+           without decreasing threads' (except main) priorities. */
         berkeley_style = true;
       }
 #ifdef FILESYS

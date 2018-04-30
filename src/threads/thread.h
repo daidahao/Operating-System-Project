@@ -94,7 +94,7 @@ struct thread
     struct list_elem elem;              /* List element. */
 
 
-    /* Members Introduced by Project 1 */
+    /* Members Introduced in Project 1 */
 
     /* Task 1: timer_sleep() */
     int64_t wakeup_tick;                /* Wakt up tick. */
@@ -126,7 +126,7 @@ struct thread
 extern bool thread_mlfqs;
 
 
-/* Variables Introduced by Project 1 */
+/* Variables Introduced in Project 1 */
 
 /* Task 3: Priority Scheduler */
 /* If false (default), priority of each thread (except main thread)
@@ -142,7 +142,7 @@ tid_t main_tid;
 
 
 
-/* Functions Introduced by Project 1 */
+/* Functions Introduced in Project 1 */
 /* See thread.c for more deatils. */
 
 /* Task 2: Round Robin */
@@ -184,7 +184,7 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-/* Functions Modified by Project 1 */
+/* Functions Modified in Project 1 */
 void thread_init (void);
 void thread_tick (void);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
