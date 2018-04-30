@@ -77,13 +77,13 @@ We chose to have a sleep list to avoid busy waiting. In this way, we avoid the t
 #### thread.h
 
 * `struct thread`
-    - `int time_slice`  
+    - `unsigned time_slice`  
         Records the time slice which is set to `(priority % 7) + 2` during thread initialization.
 
 #### thread.c
 
 * `thread_tick()`  
-    This function is called by `timer_interrupt()`, so every tick it will check the time slice of the current thread. If it runs out, the thread will be thrown back to the ready list, set a new priority, and yield for running other thread.
+    This function is called by `timer_interrupt()`, so every tick it will check the time slice of the current thread. If it runs out, the thread will be thrown back to the ready list, update a new priority, and yield for running other thread.
 *  `void thread_set_priority (int new_priority)`  
     Set a new priority.
 
@@ -103,8 +103,70 @@ We add `time_slice` property in struct `thread`, which help us save the time for
 
 ### Data structures and functions
 
+#### thread.h
+
++ `struct thread`
+    + `struct lock *blocked_lock`  
+    Records the lock which block the thread. 
+    + `struct list donations`  
+    As a list containing all the lock requesters or donator, who have higher priority than current lock holder.
+    + `int ori_priority`  
+    Records the original priority after it receives other thread donation. 
+    + `bool donated`  
+    Indicate if the current thread is received other thread donation. 
+
++ `void set_blocked_lock (struct lock *)`  
+    Records the current thread is blocked by the specific lock.
++ `void donate_priority(struct lock *)`  
+    Donate priority to the lock holder.
++ `void undo_donate_priority (struct lock *)`  
+    Undo priority donation after the thread releases the lock.
++ `bool thread_cmp_by_priority (const struct list_elem *, const struct list_elem *, void * UNUSED)`  
+    Compare 2 thread's priority. 
+
+#### thread.c
+
++ `tid_t thread_create (const char *name, int priority, thread_func *function, void *aux) `  
+    After thread creation, current thread must yield if it has lower priority than the new one.
+
++ `void thread_set_priority (int new_priority)`  
+    Set the current thread's priority to NEW_PRIORITY. If the current thread's has received donation, we store NEW_PRIORITY into ORI_PRIORITY so that once all donations are revoked, NEW_PRIORITY will take effect.
+
++ `static struct thread * next_thread_to_run (void) `  
+    Get the thread in the ready list with the highest priority.
+ 
+#### synch.h
+
++ `struct lock`
+    + `int donation`  
+    Records lock holders priority before receiving donation.
+    + `struct list_elem don_elem`  
+    As a list_elem in the donation list.
+
++ `bool donation_cmp (const struct list_elem *, const struct list_elem *, void *)`  
+    Compare donation property in `struct lock`.
+
++ `bool waiter_cmp (const struct list_elem *, const struct list_elem *, void *)`  
+    Compare waiting thread priority property in `struct semaphore_elem`.
+
++ `int get_donation (const struct list_elem *elem)`  
+    Get method of donation property in `struct lock`.
+
+#### synch.c
+
++ `void sema_up (struct semaphore *sema)`  
+    Increments SEMA's value and wakes up the highest priority thread of those waiting for SEMA.
++ `void lock_init (struct lock *lock)`  
+    Add donation property initialization procedure.
++ `void lock_acquire (struct lock *lock)`  
+    Firstly, current thread try donate priority to the lock holder if it exsists, then the thread acquire the lock if it is available. Otherwise, the thread keeps sleep until no one else who have higher priority acquire the lock.
++ `void lock_release (struct lock *lock)`
+    Release the holding lock and undo the received priority.
+
 ### Algorithms
 
 #### Priority donation algorithm
 
 ### Synchronization
+
+### Rationale
