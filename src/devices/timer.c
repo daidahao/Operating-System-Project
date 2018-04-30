@@ -64,7 +64,6 @@ wakeup (void * v UNUSED)
     {
       if (get_wakeup_tick (e) <= now)
       {
-        // printf ("Found 1 to wake up.\n");
         struct thread *t = list_entry (e, struct thread, sleep_elem);
         if (t->status != THREAD_BLOCKED)
           break;
@@ -152,7 +151,6 @@ timer_interrupt (struct intr_frame *args UNUSED)
   if (ticks >= next_wakeup_tick && sleep_sema.value==0)
   {
     sema_up (&sleep_sema);
-    // printf("<2> sleep_sema = %d\n", sleep_sema.value);
   }
 }
 
