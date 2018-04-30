@@ -72,9 +72,14 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-/* Task 3 */
+/* Task 3: Priority scheduler */
 
-bool priority_cmp (const struct thread *thread_a, const struct thread *thread_b)
+/* Compare two threads' priorities.
+   Return true if a's priority is smaller than b's or
+   a's priority is equal to b's and a's name is smaller than b's.
+   Otherwise, return false. */
+bool 
+priority_cmp (const struct thread *thread_a, const struct thread *thread_b)
 {
   bool flag = thread_a->priority > thread_b->priority;
   // if they have the same priority, compare by the thread name in the inverse dict order.
@@ -88,6 +93,7 @@ bool priority_cmp (const struct thread *thread_a, const struct thread *thread_b)
     return false;
 }
 
+/* Less function for comparing priorities in the ready list. */
 bool
 thread_cmp_by_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
@@ -96,12 +102,17 @@ thread_cmp_by_priority (const struct list_elem *a, const struct list_elem *b, vo
   return priority_cmp (thread_a, thread_b);
 }
 
+/* Set LOCK as current thread's BLOKED LOCK. */
 void 
 set_blocked_lock (struct lock *b_lock)
 {
   thread_current ()->blocked_lock = b_lock;
 }
 
+/* Donate priority in order to acquire LOCK and 
+   insert LOCK into the donee's donations list.
+   Then, donate the priority recursively if the 
+   donee is blocked by another lock. */
 void 
 donate_priority (struct lock *lock)
 {
@@ -116,68 +127,50 @@ donate_priority (struct lock *lock)
     intr_set_level (old_level);
     return;
   }
+  /* Donate priority only if donee's is lower than donor's. */
   if (donee->priority < priority_cur)
   {
+    /* If donee hasn't received any donation,
+       we save its current PRIORITY into ORI_PRIORITY. */
     if (!donee->donated)
       donee->ori_priority = donee->priority;
     donee->donated = true;
-    if (lock->donation == LOCK_INIT_DONATION)
-    {
-      lock->donation = priority_cur;
-      list_push_back (&donee->donations, &lock->don_elem);
-      // list_insert_ordered 
-      //     (&donee->donations, &lock->don_elem, donation_cmp, NULL);
-    }
-    else
-    {
-      lock->donation = priority_cur;
-    }
-    // list_remove (&lock->don_elem);
-    /*
-    if (lock->prev_priority == LOCK_INIT_PREV_PRIORITY)
-      lock->prev_priority = donee->priority;
-    */
     donee->priority = priority_cur;
-    if (donee->status == THREAD_READY)
-    {
-      // Perhaps list_remove () && list_insert_ordered () is more efficient
-      // list_sort (&ready_list, &thread_cmp_by_priority, NULL);
-      list_remove (&donee->elem);
-      list_push_back (&ready_list, &donee->elem);
-      // list_insert_ordered (&ready_list, &donee->elem, &thread_cmp_by_priority, NULL);
-    }
-    else if (donee->status == THREAD_BLOCKED)
-    {
+
+    /* Insert LOCK into DONATIONS list. */
+    if (lock->donation == LOCK_INIT_DONATION)
+      list_push_back (&donee->donations, &lock->don_elem);
+    lock->donation = priority_cur;
+
+    /* Donate recursively if donee is blocked. */
+    if (donee->status == THREAD_BLOCKED)
       donate_priority (donee->blocked_lock);
-    }
   }
   intr_set_level (old_level);
 }
 
+/* Undo donations because of LOCK. */
 void
 undo_donate_priority (struct lock *lock)
 {
   struct thread *thread_cur = thread_current ();
   enum intr_level old_level = intr_disable ();
 
-  /*
-  if (lock->prev_priority == LOCK_INIT_PREV_PRIORITY)
-  {
-    intr_set_level (old_level);
-    return;
-  }
-  if (thread_current ()->priority > lock->prev_priority)
-    // thread_set_priority (lock->prev_priority);
-    thread_current ()->priority = lock->prev_priority;
-  lock->prev_priority = LOCK_INIT_PREV_PRIORITY;
-  */
+  /* Check if LOCK has led to any donation. */
   if (lock->donation == LOCK_INIT_DONATION)
   {
     intr_set_level (old_level);
     return;
   }
+
+  /* Remove LOCK from DONATIONS list. */
   list_remove (&lock->don_elem);
   lock->donation = LOCK_INIT_DONATION;
+
+  /* If current thread's DONATIONS list is empty,
+     we reset its PRIORITY to ORI_PRIORITY.
+     Otherwise, we set its PRIORITY to the highest
+     priority in the donations list. */
   if (list_empty (&thread_cur->donations))
   {
     thread_cur->priority = thread_cur->ori_priority;
@@ -185,7 +178,8 @@ undo_donate_priority (struct lock *lock)
   }
   else
   {
-    struct list_elem *elem = list_min (&thread_cur->donations, &donation_cmp, NULL);
+    struct list_elem *elem = 
+        list_min (&thread_cur->donations, &donation_cmp, NULL);
     thread_cur->priority = get_donation (elem);
   }
 
@@ -218,6 +212,9 @@ thread_init (void)
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
+
+  /* To help us identify the main thread, we store main thread's tid. */
+  /* See thread.h for reasons. */
   main_tid = (initial_thread->tid = allocate_tid ());
 }
 
@@ -268,20 +265,22 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  /* Enforce preemption. */
+  /* Return if the current thread hasn't used up TIME_SLICE. */
   ++thread_ticks;
   if (berkeley_style && thread_ticks < TIME_SLICE)
     return;
   if (!berkeley_style && thread_ticks < t->time_slice)
     return;
 
-  /* Otherwise */
+  /* Otherwise, yield (if necessary) on returning from the interrupt. */
   ASSERT (intr_get_level () == INTR_OFF);
   if (!berkeley_style)
   {
+    /* Decrease PRIORITY by 3 unless the current thread is main. */
     if (t->tid != main_tid)
-      t->ori_priority = t->priority = 
-                max(t->priority - 3, 0);
+      t->ori_priority = t->priority = max(t->priority - 3, 0);
+    /* Only yield when the priority is smaller than the highest 
+       in READY_LIST. */
     if (t->priority < list_entry (
       list_min (&ready_list, &thread_cmp_by_priority, NULL), 
         struct thread, elem)->priority)
@@ -289,9 +288,6 @@ thread_tick (void)
       intr_yield_on_return();
     }
     return;
-    // list_remove (&t->elem);
-    // list_insert_ordered (&ready_list, &t->elem, thread_cmp_by_priority, NULL);
-    // thread_set_priority(max(thread_get_priority () - 3, 0));
   }
   intr_yield_on_return();
   
@@ -360,6 +356,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  /* If the newly created thread's priority is larger than
+     the current thread's, yield! */
   if (priority > thread_get_priority ())
     thread_yield ();
 
@@ -400,7 +398,6 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
-  // list_insert_ordered(&ready_list, &t->elem, &thread_cmp_by_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -472,7 +469,6 @@ thread_yield (void)
   old_level = intr_disable ();
   if (cur != idle_thread) 
     list_push_back (&ready_list, &cur->elem);
-    // list_insert_ordered(&ready_list, &cur->elem, &thread_cmp_by_priority, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -495,27 +491,23 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY. */
+/* Set the current thread's priority to NEW_PRIORITY.
+   If the current thread's has received donation, 
+   we store NEW_PRIORITY into ORI_PRIORITY so that
+   once all donations are revoked, NEW_PRIORITY 
+   will take effect. */
 void
 thread_set_priority (int new_priority) 
 {
   struct thread* thread_cur = thread_current ();
 
-  enum intr_level old_level = intr_disable ();
-
   if (thread_cur->donated)
-  {
     thread_cur->ori_priority = new_priority;
-    intr_set_level (old_level);
-  }
   else
   {
     thread_cur->priority = new_priority;
-    intr_set_level (old_level);
     thread_yield();
   }
-  // if (new_priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
-  //  thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -523,7 +515,6 @@ int
 thread_get_priority (void) 
 {
   return thread_current ()->priority;
-
 }
 
 unsigned
@@ -649,6 +640,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->ori_priority = t->priority = priority;
+  /* Calculate TIME_SLICE value only based on ORIGINAL PRIORITY. */
   t->time_slice = (priority % 7) + 2;
   t->magic = THREAD_MAGIC;
 
@@ -659,7 +651,6 @@ init_thread (struct thread *t, const char *name, int priority)
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
-  // list_insert_ordered(&all_list, &t->allelem, &thread_cmp_by_priority, NULL);
   intr_set_level (old_level);
 }
 
@@ -688,6 +679,7 @@ next_thread_to_run (void)
     return idle_thread;
   else
   {
+    /* Choose only the largest priority thread to run. */
     struct list_elem *elem = 
         list_min (&ready_list, thread_cmp_by_priority, NULL);
     list_remove (elem);
