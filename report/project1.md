@@ -49,10 +49,10 @@ Final Report for Project 1: Threads
 - `static int64_t ticks`  
   Number of timer ticks since OS booted.
 
-- `void thread_block (void)`
+- `void thread_block (void)`  
   Blocks a thread, requires interrupts off
 
-- `void thread_unblock (struct thread *t)`
+- `void thread_unblock (struct thread *t)`  
   Unblocks a thread
 
 ### Algorithms
@@ -109,7 +109,7 @@ We add `time_slice` property in struct `thread`, which help us save the time for
     + `struct lock *blocked_lock`  
     Records the lock which block the thread. 
     + `struct list donations`  
-    As a list containing all the lock requesters or donator, who have higher priority than current lock holder.
+    As a list containing all the lock requesters or donors, who have higher priority than current lock holder.
     + `int ori_priority`  
     Records the original priority after it receives other thread donation. 
     + `bool donated`  
@@ -160,13 +160,30 @@ We add `time_slice` property in struct `thread`, which help us save the time for
     Add donation property initialization procedure.
 + `void lock_acquire (struct lock *lock)`  
     Firstly, current thread try donate priority to the lock holder if it exsists, then the thread acquire the lock if it is available. Otherwise, the thread keeps sleep until no one else who have higher priority acquire the lock.
-+ `void lock_release (struct lock *lock)`
++ `void lock_release (struct lock *lock)`  
     Release the holding lock and undo the received priority.
 
 ### Algorithms
 
 #### Priority donation algorithm
 
+Idea
+
+1. A donee thread's priority is always lower than donor thread's priority.
+
+2. When a donee thread's is blocked by another thread B who held an another lock, the donor thread should donate its priority to thread B.
+
+3. When a thread releases a lock, it should wake up the waiting thread having the highest priority.
+
+
 ### Synchronization
 
+Most of the modifications are in places protected by disabled interrupts or semaphores, so they will not cause race conditions.
+
 ### Rationale
+
+Picking a thread to run with maximum priority takes linear time. This was selected for simplicity of coding and to prevent changing the data structure containing ready threads. A priority queue or some other structure may be faster, and may depend on the details of the scheduling algorithm.
+
+When changing priority, we considered searching the other ready threads in order to determine if the current thread should yield. However, this would require disabling interrupts to prevent race conditions with `ready_list`, and the scan could be large. It is simpler and probably faster in most cases to yield no matter what.
+
+The priority donation algorithm forces us to iterate through the lock holder chain and donor list in donee for several operations. It is okay that a single thread own a small number of locks at once, but the thread will keep the highest priority among the donations.
