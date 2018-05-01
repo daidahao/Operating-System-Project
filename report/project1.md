@@ -3,7 +3,12 @@ Final Report for Project 1: Threads
 ## Group Members
 
 * Zhihao DAI <11510415@mail.sustc.edu.cn>
+
+    Task 1 implement and Task 3 design and implement.
+
 * Ziqiang LI <11510352@mail.sustc.edu.cn>
+
+    Task1 and Task2 implement and Task 3 design, report writing.
 
 ## Task 1: Scheduler based on time slice
 
@@ -187,3 +192,55 @@ Picking a thread to run with maximum priority takes linear time. This was select
 When changing priority, we considered searching the other ready threads in order to determine if the current thread should yield. However, this would require disabling interrupts to prevent race conditions with `ready_list`, and the scan could be large. It is simpler and probably faster in most cases to yield no matter what.
 
 The priority donation algorithm forces us to iterate through the lock holder chain and donor list in donee for several operations. It is okay that a single thread own a small number of locks at once, but the thread will keep the highest priority among the donations.
+
+<!-- ## Additional Questions
+
+1. Expected: `GOOD`. Actual: `BAD`.
+
+  Start with a lock `L`, a semaphore `S = 0`, and a thread `A` with priority `1`.
+
+  Code for thread A:
+
+  ```
+  spawn thread D with priority 0
+  acquire L
+  spawn thread C with priority 3 (C will donate its priority of 3 to A)
+  spawn thread B with priority 2
+  call down on S
+  print GOOD
+  ```
+
+  Code for thread B:
+
+  ```
+  call down on S
+  print BAD
+  ```
+
+  Code for thread C:
+
+  ```
+  try to acquire L
+  ```
+
+  Code for thread D:
+  ```
+  call up on S (A and B are waiting. A has eff. 3 and base 1, while B has both 2)
+  ```
+
+2. MLFQS table:
+
+  timer ticks | R(A) | R(B) | R(C) | P(A) | P(B) | P(C) | thread to run
+  ------------|------|------|------|------|------|------|--------------
+  0           |     0|     0|     0|    63|    61|    59| A
+  4           |     4|     0|     0|    62|    61|    59| A
+  8           |     8|     0|     0|    61|    61|    59| A
+  12          |    12|     0|     0|    60|    61|    59| B
+  16          |    12|     4|     0|    60|    60|    59| A
+  20          |    16|     4|     0|    59|    60|    59| B
+  24          |    16|     8|     0|    59|    59|    59| A
+  28          |    20|     8|     0|    58|    59|    59| B 
+  32          |    20|    12|     0|    58|    58|    59| C
+  36          |    20|    12|     4|    58|    58|    58| A 
+
+3. The question didn’t specify the `PRI_MAX` and the number of ticks per second so we assumed their values based on other parts of the project spec. We assumed `PRI_MAX = 63`, and that there are 100 ticks per second (meaning we do not consider any formulas containing `load_avg` since there are only 36 ticks). We also assumed that threads with the same priority are ordered in a round-robin fashion when picking which one to run. In this case we assume "round-robin" is alphabetical order. -->
