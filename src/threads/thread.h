@@ -87,16 +87,29 @@ struct thread
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
-    int priority;                       /* Priority. */
-    int time_slice;                     /* Time slice.*/
+    int priority;                       /* (Effective) Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    /* For timer_sleep() */
-    int64_t wakeup_tick;
-    struct list_elem sleep_elem;
+
+    /* Members Introduced in Project 1 */
+
+    /* Task 1: timer_sleep() */
+    int64_t wakeup_tick;                /* Wakt up tick. */
+    struct list_elem sleep_elem;        /* List element for sleep list. */
+
+    /* Task 2: Round Robin */
+    unsigned time_slice;                /* Time slice.*/
+
+    /* Task 3: Priority Scheduler */
+    struct lock *blocked_lock;          /* Lock that blocks the thread. */
+    struct list donations;              /* List of donations received. */
+    int ori_priority;                   /* Original priority before any donation. */
+    bool donated;                       /* Receive donation or not. */
+
+
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -112,16 +125,42 @@ struct thread
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
-void thread_init (void);
+
+/* Variables Introduced in Project 1 */
+
+/* Task 3: Priority Scheduler */
+/* If false (default), priority of each thread (except main thread)
+   will decrease by 3 after each time slice until it becomes zero.
+   If true, priority of each thread will not decrease over time,
+   unless there is a donation or request by the thread itself.
+*/
+bool berkeley_style;
+/* Main thread's tid. We store this because we need to identify 
+   main thread in thread_tick() and make sure that if berkeley_style 
+   is true, its priority will not decrease overtime. */
+tid_t main_tid;
+
+
+
+/* Functions Introduced in Project 1 */
+/* See thread.c for more deatils. */
+
+/* Task 2: Round Robin */
+unsigned thread_get_time_slice (void);
+
+/* Task 3: Priority Scheduler */
+void set_blocked_lock (struct lock *);
+void donate_priority(struct lock *);
+void undo_donate_priority (struct lock *);
+bool thread_cmp_by_priority (const struct list_elem *, const struct list_elem *, void * UNUSED);
+bool priority_cmp (const struct thread *, const struct thread *);
+
+
 void thread_start (void);
 
-void thread_tick (void);
 void thread_print_stats (void);
-bool thread_cmp_by_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-bool thread_allcmp_by_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 typedef void thread_func (void *aux);
-tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
@@ -139,11 +178,16 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
-int thread_get_time_slice (void);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+/* Functions Modified in Project 1 */
+void thread_init (void);
+void thread_tick (void);
+tid_t thread_create (const char *name, int priority, thread_func *, void *);
+
 
 #endif /* threads/thread.h */
