@@ -274,6 +274,11 @@ load (const char *arguments, void (**eip) (void), void **esp)
   char *token;
   while ((token = strtok_r (NULL, " ", &save_ptr)) != NULL)
   {
+    if (argc >= MAX_ARGV_SIZE-1)
+    {
+      printf ("load: too many arguments\n");
+      break;
+    }
     argv[argc++] = token;
   }
   argv[argc+1] = NULL;
@@ -368,6 +373,7 @@ load (const char *arguments, void (**eip) (void), void **esp)
   if (!setup_stack (esp))
     goto done;
 
+  /* Push argc & argv[] onto the stack. */
   push_stack (esp, argc, argv);
 
   /* Start address. */

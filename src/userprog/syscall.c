@@ -10,6 +10,7 @@ void pop1 (void *esp, uint32_t *a1);
 void pop3 (void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3);
 int _write (void *esp);
 void _exit (void *esp);
+void __exit (int status);
 
 void
 syscall_init (void) 
@@ -51,13 +52,11 @@ _write (void *esp)
 }
 
 void
-_exit (void *esp)
+__exit (int status)
 {
-	int status;
-	pop1 (esp, (uint32_t *)&status);
 	printf ("%s: exit(%d)\n", thread_current()->name, 
 				status);
-	
+
 	/* Update process info. */
 	struct thread *current_thread = thread_current ();
 	struct child_process *process_ptr = current_thread->process_ptr;
@@ -66,6 +65,16 @@ _exit (void *esp)
 	process_ptr->exit_status = status;
 
 	thread_exit ();
+	
+	NOT_REACHED ();
+}
+
+void
+_exit (void *esp)
+{
+	int status;
+	pop1 (esp, (uint32_t *)&status);
+	__exit (status);
 	NOT_REACHED ();
 }
 
@@ -82,8 +91,8 @@ syscall_handler (struct intr_frame *f)
   	case SYS_WRITE: return_value = _write (esp); break;
   	default: 
   	{
-  		printf ("system call!\n"); 
-  		thread_exit ();
+  		printf ("system call!\n");
+  		__exit (-1);
   	}
   }
 
