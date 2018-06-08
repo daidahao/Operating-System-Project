@@ -468,6 +468,7 @@ init_thread (struct thread *t, const char *name, int priority)
 #ifdef USERPROG
   /* As a Parent Process: List of children processes. */
   list_init (&(t->children_list));
+  /* Initialize semaphore loaded_sema. */
   sema_init (&(t->loaded_sema), 0);
 #endif
 
