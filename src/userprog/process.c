@@ -24,6 +24,27 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+void
+process_thread_exit (int status)
+{
+  printf ("%s: exit(%d)\n", thread_current()->name, 
+        status);
+
+  /* Update process info. */
+  struct thread *current_thread = thread_current ();
+  struct child_process *process_ptr = current_thread->process_ptr;
+  if (!(process_ptr == NULL))
+  {
+    sema_up (&(process_ptr->semaphore));
+    process_ptr->thread = NULL;
+    process_ptr->exit_status = status;
+  }
+  
+  thread_exit ();
+
+  NOT_REACHED ();
+}
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -88,8 +109,10 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+  if (!success)
+  {
+    process_thread_exit (1);
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

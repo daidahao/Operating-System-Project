@@ -4,13 +4,13 @@
 #include <debug.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "userprog/process.h"
 
 static void syscall_handler (struct intr_frame *);
 void pop1 (void *esp, uint32_t *a1);
 void pop3 (void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3);
 int _write (void *esp);
 void _exit (void *esp);
-void __exit (int status);
 
 void
 syscall_init (void) 
@@ -52,29 +52,11 @@ _write (void *esp)
 }
 
 void
-__exit (int status)
-{
-	printf ("%s: exit(%d)\n", thread_current()->name, 
-				status);
-
-	/* Update process info. */
-	struct thread *current_thread = thread_current ();
-	struct child_process *process_ptr = current_thread->process_ptr;
-	sema_up (&(process_ptr->semaphore));
-	process_ptr->thread = NULL;
-	process_ptr->exit_status = status;
-
-	thread_exit ();
-	
-	NOT_REACHED ();
-}
-
-void
 _exit (void *esp)
 {
 	int status;
 	pop1 (esp, (uint32_t *)&status);
-	__exit (status);
+	process_thread_exit (status);
 	NOT_REACHED ();
 }
 
@@ -92,7 +74,7 @@ syscall_handler (struct intr_frame *f)
   	default: 
   	{
   		printf ("system call!\n");
-  		__exit (-1);
+  		process_thread_exit (-1);
   	}
   }
 
