@@ -17,6 +17,9 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+
+#define MAX_ARGV_SIZE 30
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -38,10 +41,32 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  /* Tokenize file_name to get the new thread's name 
+      before creating the thread. */
+  char *save_ptr;
+  strtok_r ((char *)file_name, " ", &save_ptr);
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy);
+  else
+  {
+    /* Initialization for process waiting */
+    struct thread *current_thread = thread_current ();
+    struct child_process *child_process = 
+                        malloc (sizeof (struct child_process));
+    child_process->tid = tid;
+    sema_init (&(child_process->semaphore), 0);
+    child_process->waited = false;
+    enum intr_level old_level = intr_disable ();
+    child_process->thread = thread_find (tid);
+    intr_set_level (old_level);
+    child_process->thread->process_ptr = child_process;
+    child_process->exit_status = -1;
+    list_push_back (&(current_thread->children_list), 
+                    &(child_process->children_elem));
+  }
   return tid;
 }
 
@@ -85,10 +110,31 @@ start_process (void *file_name_)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
+/* TODO */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  return -1;
+  struct thread *current_thread = thread_current ();
+  struct list children_list = current_thread->children_list;
+  struct list_elem *e;
+  struct child_process *child_process;
+  for (e = list_begin (&children_list); e != list_end (&children_list);
+          e = list_next (e))
+  {
+    struct child_process *process = 
+            list_entry (e, struct child_process, children_elem);
+    if (process->tid == child_tid)
+    {
+      child_process = process;
+      sema_down (&(child_process->semaphore));
+      child_process->waited = true;
+      break;
+    }
+  }
+  if (child_process == NULL)
+    return -1;
+  else
+    return child_process->exit_status;
 }
 
 /* Free the current process's resources. */
@@ -200,13 +246,14 @@ static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
                           bool writable);
+void push_stack (void **esp, int argc, char **argv);
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
+load (const char *arguments, void (**eip) (void), void **esp) 
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -214,6 +261,22 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+
+  /* Parse the arguemtns into argc & argv. */
+  char * file_name = (char *)arguments;
+  char *save_ptr;
+  int argc = 0;
+
+  strtok_r (file_name, " ", &save_ptr);
+  char* argv[MAX_ARGV_SIZE];
+  argv[argc++] = file_name;
+
+  char *token;
+  while ((token = strtok_r (NULL, " ", &save_ptr)) != NULL)
+  {
+    argv[argc++] = token;
+  }
+  argv[argc+1] = NULL;
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -305,6 +368,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (!setup_stack (esp))
     goto done;
 
+  push_stack (esp, argc, argv);
+
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
@@ -317,6 +382,49 @@ load (const char *file_name, void (**eip) (void), void **esp)
 }
 
 /* load() helpers. */
+
+/* Project 2: Task 1. */
+void
+push_stack (void **esp, int argc, char **argv)
+{
+  /* Copy the content of argv[argc-1], ... , argv[0] 
+      onto the stack. */
+  int i;
+  for (i = argc-1; i>=0; i--)
+  {
+    char *arg = argv[i];
+    size_t arg_size = strlen(arg) + 1;
+    *esp -= arg_size;
+    memcpy (*esp, arg, arg_size);
+    /* Save pointer to the content of argv[i]. */
+    argv[i] = *esp;
+  }
+
+  /* Word align. */
+  *esp -= ((unsigned)*esp % 4);
+
+  /* Push argv[argc] (NULL), argv[argc-1], ... , argv[0]
+      onto the stack. */
+  for (i = argc; i>=0; i--)
+  {
+    *esp -= 4;
+    memcpy (*esp, &(argv[i]), 4);
+  }
+
+  /* Push argv onto the stack. */
+  void *argv_ = *esp;
+  *esp -= 4;
+  memcpy (*esp, (void *)&argv_, 4);
+
+  /* Push argc onto the stack. */
+  *esp -= 4;
+  memcpy (*esp, &argc, 4);
+
+  /* Push (fake) return addr onto the stack. */
+  void *return_addr = NULL;
+  *esp -= 4;
+  memcpy (*esp, (void *)&return_addr, 4);
+}
 
 static bool install_page (void *upage, void *kpage, bool writable);
 

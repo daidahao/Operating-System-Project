@@ -454,6 +454,7 @@ is_thread (struct thread *t)
 
 /* Does basic initialization of T as a blocked thread named
    NAME. */
+/* Project 2: Task 2. */
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
@@ -469,6 +470,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  
+  /* As a Parent Process: List of children processes. */
+  list_init (&(t->children_list));
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -588,3 +592,20 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+struct thread *
+thread_find (tid_t tid)
+{
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  struct list_elem *e;
+  /* For each thread in all_list */
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+      if (t->tid == tid)
+        return t;
+    }
+  return NULL;
+}
