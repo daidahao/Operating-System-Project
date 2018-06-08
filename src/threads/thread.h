@@ -108,6 +108,24 @@ struct thread
   };
 
 #ifdef USERPROG
+/*  Info of the child process.
+
+    To implement process_wait(), we introduce this structure.
+
+    On one hand, it has a "struct list_elem" for inserting itself
+    into the parent's children_list. Thus, the parent can access its
+    status (waited, exit_status, etc..) easily.
+
+    On the other hand, the corresponding child process has a pointer 
+    named "process_ptr" to this structure. Therefore, the child process
+    can safely save its exit status into this structure without worrying
+    it might get lost when all the resouces of the process is freed.
+
+    The initail value of "semaphore" is 0. When the child process is being 
+    waited, that is, process_wait() is called on the child, the parent downs 
+    the semaphore. When the child process exits, process_thread_wait() is 
+    called and the semaphore is upped. Then, the parent waiting for the child
+    would wake up and can retrieve the child's exit status now. */
 struct child_process
 {
   struct list_elem children_elem; /* List element for list of children of the process. */
