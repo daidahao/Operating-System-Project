@@ -98,6 +98,8 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
     struct list children_list;          /* List of children process. */
+    struct semaphore loaded_sema;       /* Semaphore for successful load. */
+    bool loaded;                        /* Whether the process is successfully loaded. */
     // struct thread *parent;              /* Parent of the process. */
     struct child_process *process_ptr;  /* Pointer to the process's information. */
 #endif

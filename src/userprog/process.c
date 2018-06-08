@@ -50,9 +50,10 @@ process_thread_exit (int status)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
-process_execute (const char *file_name) 
+process_execute (const char *file_name_) 
 {
   char *fn_copy;
+  char *file_name;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -60,7 +61,14 @@ process_execute (const char *file_name)
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy, file_name_, PGSIZE);
+
+  /* Make another copy of FILE_NAME.
+     Otherwise there's a page fault when executing exec(). */
+  file_name = palloc_get_page (0);
+  if (file_name == NULL)
+    return TID_ERROR;
+  strlcpy (file_name, file_name_, PGSIZE);
 
   /* Tokenize file_name to get the new thread's name 
       before creating the thread. */
@@ -73,18 +81,22 @@ process_execute (const char *file_name)
     palloc_free_page (fn_copy);
   else
   {
-    /* Initialization for process waiting */
+    /* Initialization for child process info (struct child process). */
     struct thread *current_thread = thread_current ();
     struct child_process *child_process = 
                         malloc (sizeof (struct child_process));
     child_process->tid = tid;
     sema_init (&(child_process->semaphore), 0);
     child_process->waited = false;
+
     enum intr_level old_level = intr_disable ();
     child_process->thread = thread_find (tid);
     intr_set_level (old_level);
+
     child_process->thread->process_ptr = child_process;
     child_process->exit_status = -1;
+
+    /* Push child process info onto children_list. */
     list_push_back (&(current_thread->children_list), 
                     &(child_process->children_elem));
   }
@@ -109,9 +121,15 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
+
+  struct thread *current_thread = thread_current ();
+  sema_up (&(current_thread->loaded_sema));
+  current_thread->loaded = success;
+
   if (!success)
   {
-    process_thread_exit (1);
+    process_thread_exit (-1);
+    NOT_REACHED ();
   }
 
   /* Start the user process by simulating a return from an
@@ -138,10 +156,10 @@ int
 process_wait (tid_t child_tid) 
 {
   struct thread *current_thread = thread_current ();
-  struct list children_list = current_thread->children_list;
+  struct list *children_list = &(current_thread->children_list);
   struct list_elem *e;
   struct child_process *child_process = NULL;
-  for (e = list_begin (&children_list); e != list_end (&children_list);
+  for (e = list_begin (children_list); e != list_end (children_list);
           e = list_next (e))
   {
     struct child_process *process = 

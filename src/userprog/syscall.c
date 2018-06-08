@@ -16,6 +16,8 @@ void pop3 (void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3);
 int _write (void *esp);
 void _exit (void *esp);
 void _halt (void *esp);
+int _exec (void *esp);
+int _wait (void *esp);
 
 void
 syscall_init (void) 
@@ -88,6 +90,34 @@ _exit (void *esp)
 	NOT_REACHED ();
 }
 
+int
+_exec (void *esp)
+{
+	const char *file;
+	pop1 (esp, (uint32_t *)&file);
+	tid_t tid = process_execute (file);
+	if (tid == TID_ERROR)
+		return -1;
+
+	enum intr_level old_level = intr_disable ();
+	struct thread *thread = thread_find (tid);
+    intr_set_level (old_level);
+
+	sema_down (&(thread->loaded_sema));
+	if (!(thread->loaded))
+		return -1;
+	return tid;
+}
+
+int
+_wait (void *esp)
+{
+	int pid;
+	pop1 (esp, (uint32_t *)&pid);
+	/* In our implementation, tid & pid is one-to-one correspondance. */
+	return process_wait (pid);
+}
+
 static void
 syscall_handler (struct intr_frame *f) 
 {
@@ -99,6 +129,8 @@ syscall_handler (struct intr_frame *f)
   {
   	case SYS_HALT: _halt (esp); NOT_REACHED ();
   	case SYS_EXIT: _exit (esp); NOT_REACHED ();
+  	case SYS_EXEC: return_value = _exec (esp); break;
+  	case SYS_WAIT: return_value = _wait (esp); break;
   	case SYS_WRITE: return_value = _write (esp); break;
   	default: 
   	{

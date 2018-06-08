@@ -123,7 +123,7 @@ void
 thread_tick (void) 
 {
   struct thread *t = thread_current ();
-  
+
   /* Update statistics. */
   if (t == idle_thread)
     idle_ticks++;
@@ -465,8 +465,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   
+#ifdef USERPROG
   /* As a Parent Process: List of children processes. */
   list_init (&(t->children_list));
+  sema_init (&(t->loaded_sema), 0);
+#endif
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
