@@ -7,6 +7,7 @@
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
 #include "threads/vaddr.h"
+#include "devices/shutdown.h"
 
 static void syscall_handler (struct intr_frame *);
 uint32_t dereference (uint32_t *addr);
@@ -14,6 +15,7 @@ void pop1 (void *esp, uint32_t *a1);
 void pop3 (void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3);
 int _write (void *esp);
 void _exit (void *esp);
+void _halt (void *esp);
 
 void
 syscall_init (void) 
@@ -72,6 +74,12 @@ _write (void *esp)
 }
 
 void
+_halt (void *esp UNUSED)
+{
+	shutdown_power_off ();
+}
+
+void
 _exit (void *esp)
 {
 	int status;
@@ -89,7 +97,8 @@ syscall_handler (struct intr_frame *f)
 
   switch (syscall_number)
   {
-  	case SYS_EXIT: _exit (esp); break;
+  	case SYS_HALT: _halt (esp); NOT_REACHED ();
+  	case SYS_EXIT: _exit (esp); NOT_REACHED ();
   	case SYS_WRITE: return_value = _write (esp); break;
   	default: 
   	{
