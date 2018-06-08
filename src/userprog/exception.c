@@ -2,6 +2,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
+#include "userprog/process.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
@@ -122,6 +123,12 @@ kill (struct intr_frame *f)
 static void
 page_fault (struct intr_frame *f) 
 {
+
+#ifdef USERPROG
+  process_thread_exit (-1);
+  NOT_REACHED ();
+#endif
+
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */

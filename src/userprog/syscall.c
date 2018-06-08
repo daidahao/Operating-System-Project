@@ -5,8 +5,11 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "userprog/process.h"
+#include "userprog/pagedir.h"
+#include "threads/vaddr.h"
 
 static void syscall_handler (struct intr_frame *);
+uint32_t dereference (uint32_t *addr);
 void pop1 (void *esp, uint32_t *a1);
 void pop3 (void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3);
 int _write (void *esp);
@@ -18,21 +21,38 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-/* TODO: Check esp before dereferencing. */
+uint32_t
+dereference (uint32_t *addr)
+{
+	if (!is_user_vaddr (addr))
+		goto exit;
+
+	struct thread *current_thread = thread_current ();
+	void *page = pagedir_get_page (current_thread->pagedir, addr);
+	if (page == NULL)
+		goto exit;
+
+	return (*((uint32_t *)page));
+
+	exit:
+		process_thread_exit (-1);
+		NOT_REACHED ();
+}
+
 void
 pop3 (void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3)
 {
 	uint32_t *esp_ = (uint32_t *)esp;
-	*a1 = *(++esp_);
-	*a2 = *(++esp_);
-	*a3 = *(++esp_);
+	*a1 = dereference(++esp_);
+	*a2 = dereference(++esp_);
+	*a3 = dereference(++esp_);
 }
 
 void
 pop1 (void *esp, uint32_t *a1)
 {
 	uint32_t *esp_ = (uint32_t *)esp;
-	*a1 = *(++esp_);
+	*a1 = dereference(++esp_);
 }
 
 int

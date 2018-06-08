@@ -33,7 +33,7 @@ process_thread_exit (int status)
   /* Update process info. */
   struct thread *current_thread = thread_current ();
   struct child_process *process_ptr = current_thread->process_ptr;
-  if (!(process_ptr == NULL))
+  if (process_ptr != NULL)
   {
     sema_up (&(process_ptr->semaphore));
     process_ptr->thread = NULL;
@@ -140,7 +140,7 @@ process_wait (tid_t child_tid)
   struct thread *current_thread = thread_current ();
   struct list children_list = current_thread->children_list;
   struct list_elem *e;
-  struct child_process *child_process;
+  struct child_process *child_process = NULL;
   for (e = list_begin (&children_list); e != list_end (&children_list);
           e = list_next (e))
   {
@@ -149,6 +149,8 @@ process_wait (tid_t child_tid)
     if (process->tid == child_tid)
     {
       child_process = process;
+      if (child_process->waited)
+        return -1;
       sema_down (&(child_process->semaphore));
       child_process->waited = true;
       break;
@@ -156,8 +158,7 @@ process_wait (tid_t child_tid)
   }
   if (child_process == NULL)
     return -1;
-  else
-    return child_process->exit_status;
+  return child_process->exit_status;
 }
 
 /* Free the current process's resources. */
