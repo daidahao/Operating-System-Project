@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -44,19 +45,34 @@ process_thread_exit (int status)
       writeable. See "struct thread" in threads/thread.h for more details.
       Notice that if there is another process running, the executable file is
       still not writable. */
-  file_close (current_thread->process_file);
+  lock_acquire (&filesys_lock);
+  if (current_thread->loaded)
+    file_close (current_thread->process_file);
+  lock_release (&filesys_lock);
 
+  /* Free all "struct child_process" allocated for children_list. */ 
+  while (!list_empty (&(current_thread->children_list)))
+  {
+    struct list_elem *e = list_pop_front (&(current_thread->children_list));
+    struct child_process *child_process = 
+            list_entry (e, struct child_process, children_elem);
+    free (child_process);
+  }
+
+  /*  Close all the files the process has opened and free the array of
+      opened files. */
   struct file **opened_files = current_thread->opened_files;
   if (opened_files == NULL)
     goto exit;
-  /* Close all opened files. */
   int i;
   for (i = 2; i < MAX_OPENED_FILES + 2; i++)
   {
     if (opened_files[i] != NULL)
     {
+      lock_acquire (&filesys_lock);
       file_close (opened_files[i]);
       opened_files[i] = NULL;
+      lock_release (&filesys_lock);
     }
   }
 
@@ -99,10 +115,17 @@ process_execute (const char *file_name_)
   char *save_ptr;
   strtok_r ((char *)file_name, " ", &save_ptr);
 
+  /* Before we create a child process and insert its info 
+  (struct child_process) into children_list, we need to disable the
+  interrup. Otherwise, the child process may start before the parent
+  insert the info into children_list. If that happens, the child process's
+  process_ptr will be NULL and will not be able to save its exit status
+  when it exits. That is, the parent will "lose" the child's info. */
+  enum intr_level old_level = intr_disable ();
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy);
+    palloc_free_page (fn_copy);  
   else
   {
     /* Initialization for child process info (struct child process). */
@@ -112,18 +135,20 @@ process_execute (const char *file_name_)
     child_process->tid = tid;
     sema_init (&(child_process->semaphore), 0);
     child_process->waited = false;
-
-    enum intr_level old_level = intr_disable ();
     child_process->thread = thread_find (tid);
-    intr_set_level (old_level);
-
-    child_process->thread->process_ptr = child_process;
-    child_process->exit_status = -1;
-
-    /* Push child process info onto children_list. */
-    list_push_back (&(current_thread->children_list), 
-                    &(child_process->children_elem));
+    if (child_process->thread != NULL)
+    {
+      child_process->thread->process_ptr = child_process;
+      child_process->exit_status = -1;
+      /* Push child process info onto children_list. */
+      list_push_back (&(current_thread->children_list), 
+                      &(child_process->children_elem));
+    }
+    else
+      free (child_process);
   }
+  intr_set_level (old_level);
+  palloc_free_page (file_name);
   return tid;
 }
 
@@ -147,8 +172,8 @@ start_process (void *file_name_)
   palloc_free_page (file_name);
 
   struct thread *current_thread = thread_current ();
-  sema_up (&(current_thread->loaded_sema));
   current_thread->loaded = success;
+  sema_up (&(current_thread->loaded_sema));
 
   if (!success)
   {
@@ -192,8 +217,8 @@ process_wait (tid_t child_tid)
       child_process = process;
       if (child_process->waited)
         return -1;
-      sema_down (&(child_process->semaphore));
       child_process->waited = true;
+      sema_down (&(child_process->semaphore));
       break;
     }
   }
@@ -327,6 +352,10 @@ load (const char *arguments, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
+  lock_acquire (&filesys_lock);
+  struct file *process_file = filesys_open (t->name);
+  lock_release (&filesys_lock);
+
   /* Parse the arguemtns into argc & argv. */
   char * file_name = (char *)arguments;
   char *save_ptr;
@@ -444,18 +473,21 @@ load (const char *arguments, void (**eip) (void), void **esp)
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
-  /*  Deny write access to the excutable file, see "struct thread" in 
-      threads/thread.h for more deatils. */
-  struct file *process_file = filesys_open (t->name);
-  if (process_file != NULL)
-  {
-    file_deny_write (process_file);
-    t->process_file = process_file;
-  }
-
   success = true;
-
+  
  done:
+  if (success)
+  {
+    /*  Deny write access to the excutable file, see "struct thread" in 
+        threads/thread.h for more deatils. */
+    if (process_file != NULL)
+    {
+      lock_acquire (&filesys_lock);
+      file_deny_write (process_file);
+      t->process_file = process_file;
+      lock_release (&filesys_lock);
+    }
+  }
   /* We arrive here whether the load is successful or not. */
   file_close (file);
   return success;

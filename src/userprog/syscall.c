@@ -40,9 +40,6 @@ unsigned _tell (void *esp);
 void _close (void *esp);
 
 
-/* Lock for synchronizing the File System Calls. */
-struct lock filesys_lock;
-
 void
 syscall_init (void) 
 {
@@ -115,6 +112,10 @@ _exec (void *esp)
 {
 	const char *file;
 	pop1 (esp, (uint32_t *)&file);
+
+	if (!is_user_vaddr (file))
+		return -1;
+
 	tid_t tid = process_execute (file);
 	if (tid == TID_ERROR)
 		return -1;
@@ -122,6 +123,9 @@ _exec (void *esp)
 	enum intr_level old_level = intr_disable ();
 	struct thread *thread = thread_find (tid);
     intr_set_level (old_level);
+
+    if (thread == NULL)
+    	return -1;
 
 	sema_down (&(thread->loaded_sema));
 	if (!(thread->loaded))
@@ -185,7 +189,8 @@ _open (void *esp)
 {
 	const char *file_name;
 	pop1 (esp, (uint32_t *)&file_name);
-	if (file_name == NULL)
+
+	if (file_name == NULL || !is_user_vaddr (file_name))
 	{
 		process_thread_exit (-1);
 		NOT_REACHED ();
