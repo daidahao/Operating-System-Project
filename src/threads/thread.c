@@ -470,6 +470,9 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&(t->children_list));
   /* Initialize semaphore loaded_sema. */
   sema_init (&(t->loaded_sema), 0);
+  /* We do not initialize opened_files until the first time a file 
+      is opened. See init_opened_files() in userprog/syscall.c . */
+  t->opened_files = NULL;
 #endif
 
   old_level = intr_disable ();

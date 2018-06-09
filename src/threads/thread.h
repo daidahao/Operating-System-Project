@@ -101,6 +101,8 @@ struct thread
     struct semaphore loaded_sema;       /* Semaphore for successful load. */
     bool loaded;                        /* Whether the process is successfully loaded. */
     struct child_process *process_ptr;  /* Pointer to the process's information. */
+    /* Store File Descriptors. */
+    struct file **opened_files;         /* Array of currently opened files. */
 #endif
 
     /* Owned by thread.c. */

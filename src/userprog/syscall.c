@@ -9,6 +9,9 @@
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include "filesys/filesys.h"
+#include "threads/palloc.h"
+
+#define MAX_OPENED_FILES 128
 
 static void syscall_handler (struct intr_frame *);
 
@@ -24,8 +27,10 @@ int _exec (void *esp);
 int _wait (void *esp);
 
 /* Project 2: Task 3 File System Calls. */
+struct file **init_opened_files (void);
 bool _create (void *esp);
 bool _remove (void *esp);
+int _open (void *esp);
 int _write (void *esp);
 
 
@@ -176,6 +181,54 @@ _remove (void *esp)
 	return success;
 }
 
+struct file **
+init_opened_files (void)
+{
+	return ((struct file **) palloc_get_page (PAL_ZERO));
+}
+
+int
+_open (void *esp)
+{
+	const char *file_name;
+	pop1 (esp, (uint32_t *)&file_name);
+	if (file_name == NULL)
+	{
+		process_thread_exit (-1);
+		NOT_REACHED ();
+	}
+
+	/* We donot initialize opened_files in struct thread unitl
+	the first time a file is opened. */
+	struct file **opened_files = thread_current ()->opened_files;
+	if (opened_files == NULL)
+		opened_files =  thread_current ()->opened_files 
+					= init_opened_files ();
+
+	int file_descriptor = -1;
+
+	lock_acquire (&filesys_lock);
+	struct file *file = filesys_open (file_name);
+	lock_release (&filesys_lock);
+
+	if (file == NULL)
+		goto result;
+
+	int i;
+	for (i = 2; i < MAX_OPENED_FILES; i++)
+	{
+		if (opened_files[i] == NULL)
+		{
+			opened_files[i] = file;
+			file_descriptor = i;
+			break;
+		}
+	}
+
+	result:
+		return file_descriptor;
+}
+
 static void
 syscall_handler (struct intr_frame *f) 
 {
@@ -191,6 +244,7 @@ syscall_handler (struct intr_frame *f)
   	case SYS_WAIT: return_value = _wait (esp); break;
   	case SYS_CREATE: return_value = _create (esp); break;
   	case SYS_REMOVE: return_value = _remove (esp); break;
+  	case SYS_OPEN: return_value = _open (esp); break;
   	case SYS_WRITE: return_value = _write (esp); break;
   	default: 
   	{
