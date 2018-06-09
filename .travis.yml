@@ -1,0 +1,6 @@
+sudo: required
+dist: trusty
+before_install:
+  - source ./install.sh
+script:
+- cd src
