@@ -8,21 +8,31 @@
 #include "userprog/pagedir.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
+#include "filesys/filesys.h"
 
 static void syscall_handler (struct intr_frame *);
+
 uint32_t dereference (uint32_t *addr);
 void pop1 (void *esp, uint32_t *a1);
+void pop2 (void *esp, uint32_t *a1, uint32_t *a2);
 void pop3 (void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3);
-int _write (void *esp);
+
 void _exit (void *esp);
 void _halt (void *esp);
 int _exec (void *esp);
 int _wait (void *esp);
 
+bool _create (void *esp);
+int _write (void *esp);
+
+/* Lock for synchronizing the File System Calls. */
+struct lock filesys_lock;
+
 void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init (&filesys_lock);
 }
 
 uint32_t
@@ -43,6 +53,24 @@ dereference (uint32_t *addr)
 		NOT_REACHED ();
 }
 
+/* Pop 1 arguments off the stack by ESP. */
+void
+pop1 (void *esp, uint32_t *a1)
+{
+	uint32_t *esp_ = (uint32_t *)esp;
+	*a1 = dereference(++esp_);
+}
+
+/* Pop 2 arguments off the stack by ESP. */
+void
+pop2 (void *esp, uint32_t *a1, uint32_t *a2)
+{
+	uint32_t *esp_ = (uint32_t *)esp;
+	*a1 = dereference(++esp_);
+	*a2 = dereference(++esp_);
+}
+
+/* Pop 3 arguments off the stack by ESP. */
 void
 pop3 (void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3)
 {
@@ -50,13 +78,6 @@ pop3 (void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3)
 	*a1 = dereference(++esp_);
 	*a2 = dereference(++esp_);
 	*a3 = dereference(++esp_);
-}
-
-void
-pop1 (void *esp, uint32_t *a1)
-{
-	uint32_t *esp_ = (uint32_t *)esp;
-	*a1 = dereference(++esp_);
 }
 
 int
@@ -118,6 +139,23 @@ _wait (void *esp)
 	return process_wait (pid);
 }
 
+bool
+_create (void *esp)
+{
+	const char *file;
+	unsigned initial_size;
+	pop2 (esp, (uint32_t *)&file, (uint32_t *)&initial_size);
+	if (file == NULL)
+	{
+		process_thread_exit (-1);
+		NOT_REACHED ();
+	}
+	lock_acquire (&filesys_lock);
+	bool success = filesys_create (file, initial_size);
+	lock_release (&filesys_lock);
+	return success;
+}
+
 static void
 syscall_handler (struct intr_frame *f) 
 {
@@ -131,6 +169,7 @@ syscall_handler (struct intr_frame *f)
   	case SYS_EXIT: _exit (esp); NOT_REACHED ();
   	case SYS_EXEC: return_value = _exec (esp); break;
   	case SYS_WAIT: return_value = _wait (esp); break;
+  	case SYS_CREATE: return_value = _create (esp); break;
   	case SYS_WRITE: return_value = _write (esp); break;
   	default: 
   	{
