@@ -280,7 +280,7 @@ _read (void *esp)
 		return size;
 	}
 
-	/* Otherwise, read from the corresponding file using file_read(). */
+	/* Otherwise, reads from the corresponding file using file_read(). */
 	struct file *file;
 	if (!is_fd_valid (fd, &file))
 		return -1;
@@ -288,7 +288,7 @@ _read (void *esp)
 	lock_acquire (&filesys_lock);
 	int bytes_read =  file_read (file, buffer, size);
 	lock_release (&filesys_lock);
-	
+
 	return bytes_read;
 }
 
@@ -300,12 +300,32 @@ _write (void *esp)
 	unsigned size;
 	pop3 (esp, (uint32_t *)&fd, (uint32_t *)&buffer, 
 				(uint32_t *)&size);
+
+	/* 	Check whether buffer is valid user address. If not, exit the 
+		thread with status -1. */
+	if (!is_user_vaddr (buffer))
+	{
+		process_thread_exit (-1);
+		NOT_REACHED ();
+	}
+
+	/* Fd 1 writes to the console using putbuf(). */
 	if (fd == 1)
 	{
 		putbuf (buffer, size);
 		return size;
 	}
-	return 0;
+
+	/* Otherwise, writes to the corresponding file using file_write(). */
+	struct file *file;
+	if (!is_fd_valid (fd, &file))
+		return -1;
+
+	lock_acquire (&filesys_lock);
+	int bytes_written =  file_write (file, buffer, size);
+	lock_release (&filesys_lock);
+
+	return bytes_written;
 }
 
 static void
