@@ -56,6 +56,11 @@ process_thread_exit (int status)
     struct list_elem *e = list_pop_front (&(current_thread->children_list));
     struct child_process *child_process = 
             list_entry (e, struct child_process, children_elem);
+    /*  Set process_ptr of the child to NULL to avoid page fault when the parent
+        exits before the child. */
+    struct thread *child_thread = child_process->thread;
+    if (child_thread != NULL)
+      child_thread->process_ptr = NULL;
     free (child_process);
   }
 
