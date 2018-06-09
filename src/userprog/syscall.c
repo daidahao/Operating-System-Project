@@ -37,6 +37,9 @@ int _open (void *esp);
 int _filesize (void *esp);
 int _read (void *esp);
 int _write (void *esp);
+void _seek (void *esp);
+unsigned _tell (void *esp);
+void _close (void *esp);
 
 
 /* Lock for synchronizing the File System Calls. */
@@ -328,6 +331,66 @@ _write (void *esp)
 	return bytes_written;
 }
 
+void
+_seek (void *esp)
+{
+	int fd;
+	unsigned position;
+	pop2 (esp, (uint32_t *)&fd, (uint32_t *)&position);
+
+	/* Retrieve pointer to the file using fd. */
+	struct file *file;
+	if (!is_fd_valid (fd, &file))
+	{
+		process_thread_exit (-1);
+		NOT_REACHED ();
+	}
+
+	/* 	Changes the next byte to be read or written in open file fd 
+		to position using file_seek(). */
+	lock_acquire (&filesys_lock);
+	file_seek (file, position);
+	lock_release (&filesys_lock);
+}
+
+unsigned
+_tell (void *esp)
+{
+	int fd;
+	pop1 (esp, (uint32_t *)&fd);
+
+	/* Retrieve pointer to the file using fd. */
+	struct file *file;
+	if (!is_fd_valid (fd, &file))
+	{
+		process_thread_exit (-1);
+		NOT_REACHED ();
+	}
+
+	return file_tell (file);
+}
+
+void
+_close (void *esp)
+{
+	int fd;
+	pop1 (esp, (uint32_t *)&fd);
+
+	/* Retrieve pointer to the file using fd. */
+	struct file *file;
+	if (!is_fd_valid (fd, &file))
+	{
+		process_thread_exit (-1);
+		NOT_REACHED ();
+	}
+
+	/* Closes file descriptor fd using file_close(). */
+	lock_acquire (&filesys_lock);
+	file_close (file);
+	(thread_current ()->opened_files)[fd] = NULL;
+	lock_release (&filesys_lock);
+}
+
 static void
 syscall_handler (struct intr_frame *f) 
 {
@@ -347,6 +410,9 @@ syscall_handler (struct intr_frame *f)
   	case SYS_FILESIZE: return_value = _filesize (esp); break;
   	case SYS_READ: return_value = _read (esp); break;
   	case SYS_WRITE: return_value = _write (esp); break;
+  	case SYS_SEEK: _seek (esp); break;
+  	case SYS_CLOSE: _close (esp); break;
+  	case SYS_TELL: return_value =  _tell (esp); break;
   	default: 
   	{
   		printf ("system call!\n");
