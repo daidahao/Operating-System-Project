@@ -12,10 +12,10 @@ To implement Project 1 & 2, we have made modified the following files.
 
 - [devices/timer.h](src/devices/timer.h)
 - [devices/timer.c](src/devices/timer.c)
+- [threads/thread.h](src/threads/thread.h)
+- [threads/thread.c](src/threads/threads.c)
 - [threads/synch.h](src/threads/synch.h)
 - [threads/synch.c](src/threads/synch.c)
-- [threads/thread.h](src/threads/thread.h)
-- [threads/threads.c](src/threads/threads.c)
 - [threads/init.c](src/threads/init.c)
 - [tests/threads/Make.tests](src/tests/threads/Make.tests)
 
@@ -45,17 +45,27 @@ $ git diff --stat 33f1019f9b6789b91b3bdcdedf968088471775c2 3f025169e92b6ce73f74c
 
 ### Project 2: User Programs
 
+- [userprog/syscall.h](src/threads/syscall.h)
+- [userprog/syscall.c](src/threads/syscall.c)
+- [userprog/process.h](src/userprog/process.h)
+- [userprog/process.c](src/userprog/process.c)
+- [threads/thread.h](src/threads/thread.h)
+- [threads/thread.c](src/threads/thread.c)
+- [userprog/exception.c](src/userprog/exception.c)
+
 #### Raw Log
 ```shell
 $ git diff --stat 933b1b846ecc8440fedf9423e52d61600e30e3a7
- README.md                |  44 ++++++
+ .travis.yml              |  15 ++
+ README.md                |  61 +++++++
  README.txt               |   2 -
+ install.sh               |  18 +++
  src/threads/thread.c     |  40 ++++-
- src/threads/thread.h     |  51 +++++++
+ src/threads/thread.h     |  51 ++++++
  src/userprog/exception.c |  15 ++
- src/userprog/process.c   | 238 +++++++++++++++++++++++++++--
+ src/userprog/process.c   | 243 ++++++++++++++++++++++++++--
  src/userprog/process.h   |   2 +
- src/userprog/syscall.c   | 414 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+ src/userprog/syscall.c   | 414 ++++++++++++++++++++++++++++++++++++++++++++++-
  src/userprog/syscall.h   |   8 +
- 9 files changed, 794 insertions(+), 20 deletions(-)
+ 11 files changed, 849 insertions(+), 20 deletions(-)
 ```
