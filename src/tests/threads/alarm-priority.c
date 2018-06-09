@@ -20,7 +20,8 @@ test_alarm_priority (void)
     
     sema_init (&wait_sema, 0);
     
-    for (int i = 0; i < 10; i++)
+    int i;
+    for (i = 0; i < 10; i++)
     {
         int priority = PRI_DEFAULT - (i + 5) % 10 - 1;
         char name[16];
@@ -29,7 +30,7 @@ test_alarm_priority (void)
     }
     
     printf ("\nbegin\n");
-    for (int i = 0; i < 10; i++)
+    for (i = 0; i < 10; i++)
         sema_up (&wait_sema);
     
     timer_sleep(2000);
@@ -46,7 +47,8 @@ alarm_priority_thread (void *aux UNUSED)
     sema_down (&wait_sema);
     /* Print a message on wake-up. */
     int64_t t = timer_ticks ();
-    for (int i = 0; i < 30; )
+    int i;
+    for (i = 0; i < 30; )
         if (timer_ticks () != t)
             i++, t = timer_ticks ();
 }
