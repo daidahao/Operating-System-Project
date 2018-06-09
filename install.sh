@@ -13,5 +13,6 @@ make
 sudo make install
 # test bochs
 # bochs --version
+# set $PATH properly
 cd ..
 export PATH="$PATH:$(readlink -f ./src/utils)"
