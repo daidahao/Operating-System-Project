@@ -10,5 +10,6 @@ script:
 - cd src/userprog
 - make clean
 - make check
+after_failure:
 - cat build/tests/userprog/rox-multichild.output
 - cat build/tests/userprog/rox-multichild.result
