@@ -2,14 +2,16 @@
 #include <stdio.h>
 #include <syscall-nr.h>
 #include <debug.h>
+#include "devices/shutdown.h"
+#include "devices/input.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "threads/palloc.h"
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
-#include "threads/vaddr.h"
-#include "devices/shutdown.h"
 #include "filesys/filesys.h"
-#include "threads/palloc.h"
+#include "filesys/file.h"
 
 #define MAX_OPENED_FILES 128
 
@@ -28,9 +30,12 @@ int _wait (void *esp);
 
 /* Project 2: Task 3 File System Calls. */
 struct file **init_opened_files (void);
+bool is_fd_valid (int fd, struct file **file);
 bool _create (void *esp);
 bool _remove (void *esp);
 int _open (void *esp);
+int _filesize (void *esp);
+int _read (void *esp);
 int _write (void *esp);
 
 
@@ -87,22 +92,6 @@ pop3 (void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3)
 	*a1 = dereference(++esp_);
 	*a2 = dereference(++esp_);
 	*a3 = dereference(++esp_);
-}
-
-int
-_write (void *esp)
-{
-	int fd;
-	const void *buffer;
-	unsigned size;
-	pop3 (esp, (uint32_t *)&fd, (uint32_t *)&buffer, 
-				(uint32_t *)&size);
-	if (fd == 1)
-	{
-		putbuf (buffer, size);
-		return size;
-	}
-	return 0;
 }
 
 void
@@ -181,6 +170,9 @@ _remove (void *esp)
 	return success;
 }
 
+/* 	Helper function for file system calls.
+	Allocate a new page to "struct file **opened_files" 
+	in "struct thread". */
 struct file **
 init_opened_files (void)
 {
@@ -198,14 +190,13 @@ _open (void *esp)
 		NOT_REACHED ();
 	}
 
-	/* We donot initialize opened_files in struct thread unitl
+	int file_descriptor = -1;
+	/* We do not initialize opened_files in struct thread unitl
 	the first time a file is opened. */
 	struct file **opened_files = thread_current ()->opened_files;
 	if (opened_files == NULL)
 		opened_files =  thread_current ()->opened_files 
 					= init_opened_files ();
-
-	int file_descriptor = -1;
 
 	lock_acquire (&filesys_lock);
 	struct file *file = filesys_open (file_name);
@@ -214,8 +205,11 @@ _open (void *esp)
 	if (file == NULL)
 		goto result;
 
+	/* Find the first NULL element in opened_files such that we can 
+	allocate the index as a file descriptor to the file. If such element
+	does not exist, return -1. */
 	int i;
-	for (i = 2; i < MAX_OPENED_FILES; i++)
+	for (i = 2; i < MAX_OPENED_FILES + 2; i++)
 	{
 		if (opened_files[i] == NULL)
 		{
@@ -227,6 +221,91 @@ _open (void *esp)
 
 	result:
 		return file_descriptor;
+}
+
+/* 	Helper function for file system calls.
+	Determine whether the fd is valid for the current process. */
+bool
+is_fd_valid (int fd, struct file **file)
+{
+	if (fd < 2 || fd > MAX_OPENED_FILES + 1)
+		return false;
+	struct file **opened_files = thread_current ()->opened_files;
+	if (opened_files == NULL || opened_files[fd] == NULL)
+		return false;
+	if (file != NULL)
+		*file = opened_files[fd];
+	return true;
+}
+
+int
+_filesize (void *esp)
+{
+	int fd;
+	pop1 (esp, (uint32_t *)&fd);
+
+	struct file *file;
+	if (!is_fd_valid (fd, &file))
+		return -1;
+
+	lock_acquire (&filesys_lock);
+	int file_size = file_length (file);
+	lock_release (&filesys_lock);
+
+	return file_size;
+}
+
+int
+_read (void *esp)
+{
+	int fd;
+	void *buffer;
+	unsigned size;
+	pop3 (esp, (uint32_t *)&fd, (uint32_t *)&buffer, (uint32_t *)&size);
+
+	/* 	Check whether buffer is valid user address. If not, exit the 
+		thread with status -1. */
+	if (!is_user_vaddr (buffer))
+	{
+		process_thread_exit (-1);
+		NOT_REACHED ();
+	}
+	
+	/* Fd 0 reads from the keyboard using input_getc(). */
+	if (fd == 0)
+	{
+		char *buffer__ = (char *) buffer;
+		while (size-- > 0)
+			*(buffer__++) = input_getc ();
+		return size;
+	}
+
+	/* Otherwise, read from the corresponding file using file_read(). */
+	struct file *file;
+	if (!is_fd_valid (fd, &file))
+		return -1;
+
+	lock_acquire (&filesys_lock);
+	int bytes_read =  file_read (file, buffer, size);
+	lock_release (&filesys_lock);
+	
+	return bytes_read;
+}
+
+int
+_write (void *esp)
+{
+	int fd;
+	const void *buffer;
+	unsigned size;
+	pop3 (esp, (uint32_t *)&fd, (uint32_t *)&buffer, 
+				(uint32_t *)&size);
+	if (fd == 1)
+	{
+		putbuf (buffer, size);
+		return size;
+	}
+	return 0;
 }
 
 static void
@@ -245,6 +324,8 @@ syscall_handler (struct intr_frame *f)
   	case SYS_CREATE: return_value = _create (esp); break;
   	case SYS_REMOVE: return_value = _remove (esp); break;
   	case SYS_OPEN: return_value = _open (esp); break;
+  	case SYS_FILESIZE: return_value = _filesize (esp); break;
+  	case SYS_READ: return_value = _read (esp); break;
   	case SYS_WRITE: return_value = _write (esp); break;
   	default: 
   	{
