@@ -12,4 +12,6 @@ cd bochs-2.6.7
 make
 sudo make install
 # test bochs
-bochs --version
+# bochs --version
+cd ..
+export PATH="$PATH:$(readlink -f ./src/utils)"

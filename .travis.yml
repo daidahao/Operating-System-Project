@@ -3,4 +3,10 @@ dist: trusty
 before_install:
   - source ./install.sh
 script:
-- cd src
+- cd src/utils
+- make clean
+- make
+- cd ../../
+- cd src/userprog
+- make clean
+- make check
