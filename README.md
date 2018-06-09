@@ -42,3 +42,20 @@ $ git diff --stat 33f1019f9b6789b91b3bdcdedf968088471775c2 3f025169e92b6ce73f74c
  src/utils/.gitignore                    |   1 +
  17 files changed, 2107 insertions(+), 51 deletions(-)
 ```
+
+### Project 2: User Programs
+
+#### Raw Log
+```shell
+$ git diff --stat 933b1b846ecc8440fedf9423e52d61600e30e3a7
+ README.md                |  44 ++++++
+ README.txt               |   2 -
+ src/threads/thread.c     |  40 ++++-
+ src/threads/thread.h     |  51 +++++++
+ src/userprog/exception.c |  15 ++
+ src/userprog/process.c   | 238 +++++++++++++++++++++++++++--
+ src/userprog/process.h   |   2 +
+ src/userprog/syscall.c   | 414 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+ src/userprog/syscall.h   |   8 +
+ 9 files changed, 794 insertions(+), 20 deletions(-)
+```
