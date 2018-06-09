@@ -36,9 +36,9 @@ process_thread_exit (int status)
   struct child_process *process_ptr = current_thread->process_ptr;
   if (process_ptr != NULL)
   {
-    sema_up (&(process_ptr->semaphore));
     process_ptr->thread = NULL;
     process_ptr->exit_status = status;
+    sema_up (&(process_ptr->semaphore));
   }
 
   /*  Close the executable file of the process so that it may become
