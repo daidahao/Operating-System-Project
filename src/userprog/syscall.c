@@ -17,13 +17,17 @@ void pop1 (void *esp, uint32_t *a1);
 void pop2 (void *esp, uint32_t *a1, uint32_t *a2);
 void pop3 (void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3);
 
+/* Project 2: Task 2 Process System Calls. */
 void _exit (void *esp);
 void _halt (void *esp);
 int _exec (void *esp);
 int _wait (void *esp);
 
+/* Project 2: Task 3 File System Calls. */
 bool _create (void *esp);
+bool _remove (void *esp);
 int _write (void *esp);
+
 
 /* Lock for synchronizing the File System Calls. */
 struct lock filesys_lock;
@@ -156,6 +160,22 @@ _create (void *esp)
 	return success;
 }
 
+bool
+_remove (void *esp)
+{
+	const char *file;
+	pop1 (esp, (uint32_t *)&file);
+	if (file == NULL)
+	{
+		process_thread_exit (-1);
+		NOT_REACHED ();
+	}
+	lock_acquire (&filesys_lock);
+	bool success = filesys_remove (file);
+	lock_release (&filesys_lock);
+	return success;
+}
+
 static void
 syscall_handler (struct intr_frame *f) 
 {
@@ -170,6 +190,7 @@ syscall_handler (struct intr_frame *f)
   	case SYS_EXEC: return_value = _exec (esp); break;
   	case SYS_WAIT: return_value = _wait (esp); break;
   	case SYS_CREATE: return_value = _create (esp); break;
+  	case SYS_REMOVE: return_value = _remove (esp); break;
   	case SYS_WRITE: return_value = _write (esp); break;
   	default: 
   	{
