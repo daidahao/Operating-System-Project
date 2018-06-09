@@ -10,3 +10,5 @@ script:
 - cd src/userprog
 - make clean
 - make check
+- cat build/tests/userprog/rox-multichild.output
+- cat build/tests/userprog/rox-multichild.result
