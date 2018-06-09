@@ -39,10 +39,28 @@ process_thread_exit (int status)
     process_ptr->thread = NULL;
     process_ptr->exit_status = status;
   }
-  
-  thread_exit ();
 
-  NOT_REACHED ();
+  struct file **opened_files = current_thread->opened_files;
+  if (opened_files == NULL)
+    goto exit;
+  /* Close all opened files. */
+  int i;
+  for (i = 2; i < MAX_OPENED_FILES + 2; i++)
+  {
+    if (opened_files[i] != NULL)
+    {
+      file_close (opened_files[i]);
+      opened_files[i] = NULL;
+    }
+  }
+
+  /* Free the page allocated for opened_files. */
+  palloc_free_page (opened_files);
+
+  exit:
+    thread_exit ();
+
+    NOT_REACHED ();
 }
 
 /* Starts a new thread running a user program loaded from
@@ -151,7 +169,6 @@ start_process (void *file_name_)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
-/* TODO */
 int
 process_wait (tid_t child_tid) 
 {

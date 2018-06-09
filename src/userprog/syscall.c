@@ -13,8 +13,6 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 
-#define MAX_OPENED_FILES 128
-
 static void syscall_handler (struct intr_frame *);
 
 uint32_t dereference (uint32_t *addr);
