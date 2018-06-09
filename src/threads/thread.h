@@ -106,6 +106,15 @@ struct thread
     struct child_process *process_ptr;  /* Pointer to the process's information. */
     /* Store File Descriptors. */
     struct file **opened_files;         /* Array of currently opened files. */
+    /*  To ensure that when the process is running, its executable cannot be
+        modified, we save the pointer to the file into process_file.
+        When the process starts, the process denies write access using 
+        file_deny_write(). See load() in userprog/process.c.
+        When the process exits, the process allows write access using 
+        file_allow_write(). See process_thread_exit() in userprog/process.c.
+        Notice that executable could still be not writable if there is another
+        process of the same executable running. */
+    struct file *process_file;          /* The executable file of the process. */
 #endif
 
     /* Owned by thread.c. */

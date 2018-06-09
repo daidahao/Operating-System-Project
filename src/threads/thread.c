@@ -473,6 +473,11 @@ init_thread (struct thread *t, const char *name, int priority)
   /* We do not initialize opened_files until the first time a file 
       is opened. See init_opened_files() in userprog/syscall.c . */
   t->opened_files = NULL;
+  /*  Initialize process_file as NULL. It's only when the process is
+      successfully loaded, the value is properly set. See "struct thread"
+      in threads/thread.h and load() in userprog/process.c for more 
+      details. */
+  t->process_file = NULL;
 #endif
 
   old_level = intr_disable ();

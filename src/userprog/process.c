@@ -40,6 +40,12 @@ process_thread_exit (int status)
     process_ptr->exit_status = status;
   }
 
+  /*  Close the executable file of the process so that it may become
+      writeable. See "struct thread" in threads/thread.h for more details.
+      Notice that if there is another process running, the executable file is
+      still not writable. */
+  file_close (current_thread->process_file);
+
   struct file **opened_files = current_thread->opened_files;
   if (opened_files == NULL)
     goto exit;
@@ -437,6 +443,15 @@ load (const char *arguments, void (**eip) (void), void **esp)
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
+
+  /*  Deny write access to the excutable file, see "struct thread" in 
+      threads/thread.h for more deatils. */
+  struct file *process_file = filesys_open (t->name);
+  if (process_file != NULL)
+  {
+    file_deny_write (process_file);
+    t->process_file = process_file;
+  }
 
   success = true;
 
