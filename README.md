@@ -45,8 +45,8 @@ $ git diff --stat 33f1019f9b6789b91b3bdcdedf968088471775c2 3f025169e92b6ce73f74c
 
 ### Project 2: User Programs
 
-- [userprog/syscall.h](src/threads/syscall.h)
-- [userprog/syscall.c](src/threads/syscall.c)
+- [userprog/syscall.h](src/userprog/syscall.h)
+- [userprog/syscall.c](src/userprog/syscall.c)
 - [userprog/process.h](src/userprog/process.h)
 - [userprog/process.c](src/userprog/process.c)
 - [threads/thread.h](src/threads/thread.h)
