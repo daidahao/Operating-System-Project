@@ -100,19 +100,41 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    /*  Introduced children_list, processs_ptr for wait() & exit() system calls.
+        To see how they are actually used, check init_thread() in threads/thread.c
+        and process_execute(), process_wait(), process_thread_exit() in 
+        userprog/process.c. */
+    /*  When the parent calls process_execute(), it dynamically allocates a "struct 
+        child_process" for the child, which is supoosed to store the exit status of the
+        child (see "struct child_process" below for more details) and points child's
+        process_ptr to this info. */
+    /*  Important Notes: When the parent exits, it must clean up all the memory allocated
+        for each "struct child_process" in children_list. */
     struct list children_list;          /* List of children process. */
-    struct semaphore loaded_sema;       /* Semaphore for successful load. */
-    bool loaded;                        /* Whether the process is successfully loaded. */
     struct child_process *process_ptr;  /* Pointer to the process's information. */
-    /* Store File Descriptors. */
+    /*  Introduced loaded_sema, loaded for exec() system call.
+        To see how they are actually used, check init_thread() in threads/thread.c
+        and start_process() in userprog/process.c and _exec() in userprog/syscall.c. */
+    /*  When the parent calls exec() system call, it calls process_execute(), essentially,
+        start_process() first, then downs the semaphore of the child process. Once the 
+        child process finish loading, its load result is saved into loaded and loaded_sema 
+        is upped, thus waking up the parent in exec(). */
+    struct semaphore loaded_sema;       /* Semaphore for load. */
+    bool loaded;                        /* Whether the process is successfully loaded. */
+    /*  Introduced opened_files for File System Calls, which is an array for 
+        storing File Descriptors. It will not been allocated memory until the first time
+        _open() is called. 
+        See _open(), _write(), _close() in userprog/syscall.c for more deatils. */
+    /*  Important Notes: When the process exits, it must make sure that it cleans up the
+        memory allocated for opened_files. */
     struct file **opened_files;         /* Array of currently opened files. */
     /*  To ensure that when the process is running, its executable cannot be
         modified, we save the pointer to the file into process_file.
         When the process starts, the process denies write access using 
-        file_deny_write(). See load() in userprog/process.c.
+        file_deny_write(). Check out load() in userprog/process.c.
         When the process exits, the process allows write access using 
-        file_allow_write(). See process_thread_exit() in userprog/process.c.
-        Notice that executable could still be not writable if there is another
+        file_allow_write(). Check  out process_thread_exit() in userprog/process.c. */
+    /*  Notice that executable could still be not writable if there is another
         process of the same executable running. */
     struct file *process_file;          /* The executable file of the process. */
 #endif
@@ -145,7 +167,7 @@ struct child_process
   struct list_elem children_elem; /* List element for list of children of the process. */
   tid_t tid;                      /* Child process's tid. */
   struct semaphore semaphore;     /* Semaphore. */
-  bool waited;                    /* Whether the child process is being waited for. */
+  bool waited;                    /* Whether the child process has been waited for. */
   struct thread *thread;          /* Pointer to the child thread. */
   int exit_status;                /* Exit status. */
 };
