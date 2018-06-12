@@ -38,6 +38,7 @@ int _write (void *esp);
 void _seek (void *esp);
 unsigned _tell (void *esp);
 void _close (void *esp);
+int _practice (void *esp);
 
 
 void
@@ -394,6 +395,15 @@ _close (void *esp)
 	lock_release (&filesys_lock);
 }
 
+int
+_practice (void *esp)
+{
+	int i;
+	pop1 (esp, (uint32_t *)&i);
+
+	return i+1;
+}
+
 static void
 syscall_handler (struct intr_frame *f) 
 {
@@ -416,6 +426,7 @@ syscall_handler (struct intr_frame *f)
   	case SYS_SEEK: _seek (esp); break;
   	case SYS_CLOSE: _close (esp); break;
   	case SYS_TELL: return_value =  _tell (esp); break;
+  	case SYS_PRACTICE: return_value = _practice (esp); break;
   	default: 
   	{
   		printf ("system call!\n");

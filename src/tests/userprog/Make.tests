@@ -16,13 +16,15 @@ exec-multiple exec-missing exec-bad-ptr wait-simple wait-twice		\
 wait-killed wait-bad-pid multi-recurse multi-child-fd rox-simple	\
 rox-child rox-multichild bad-read bad-write bad-read2 bad-write2        \
 bad-jump bad-jump2 \
-open-many exec-many )
+open-many exec-many practice )
 
 tests/userprog/open-many_SRC = tests/userprog/open-many.c tests/main.c
 tests/userprog/open-many_PUTFILES += tests/userprog/sample.txt
 tests/userprog/exec-many_SRC = tests/userprog/exec-many.c tests/main.c
 tests/userprog/exec-many_PUTFILES += tests/userprog/child-bad tests/userprog/child-good tests/userprog/sample.txt
 tests/userprog/child-good_SRC = tests/userprog/child-good.c
+
+tests/userprog/practice_SRC += tests/userprog/practice.c tests/main.c
 
 tests/userprog_PROGS = $(tests/userprog_TESTS) $(addprefix \
 tests/userprog/,child-simple child-args child-bad child-close child-rox \
