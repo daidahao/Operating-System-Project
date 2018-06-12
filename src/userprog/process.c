@@ -380,7 +380,7 @@ load (const char *arguments, void (**eip) (void), void **esp)
     }
     argv[argc++] = token;
   }
-  argv[argc+1] = NULL;
+  argv[argc] = NULL;
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
