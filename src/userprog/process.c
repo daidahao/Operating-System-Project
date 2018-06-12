@@ -28,18 +28,11 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 void
 process_thread_exit (int status)
 {
-  printf ("%s: exit(%d)\n", thread_current()->name, 
+  struct thread *current_thread = thread_current ();
+  printf ("%s: exit(%d)\n", current_thread->name, 
         status);
 
-  /* Update process info. */
-  struct thread *current_thread = thread_current ();
-  struct child_process *process_ptr = current_thread->process_ptr;
-  if (process_ptr != NULL)
-  {
-    process_ptr->thread = NULL;
-    process_ptr->exit_status = status;
-    sema_up (&(process_ptr->semaphore));
-  }
+  struct child_process *process_ptr = current_thread->process_ptr;;
 
   /*  Close the executable file of the process so that it may become
       writeable. See "struct thread" in threads/thread.h for more details.
@@ -85,6 +78,14 @@ process_thread_exit (int status)
   palloc_free_page (opened_files);
 
   exit:
+    /* Update process info. */
+    if (process_ptr != NULL)
+    {
+      process_ptr->thread = NULL;
+      process_ptr->exit_status = status;
+      sema_up (&(process_ptr->semaphore));
+    }
+
     thread_exit ();
 
     NOT_REACHED ();
