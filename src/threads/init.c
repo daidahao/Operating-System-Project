@@ -90,6 +90,16 @@ main (void)
   thread_init ();
   console_init ();  
 
+  /*  Delay the booting so it may avoid 'no "Pintos booting" 
+      error when checking'. */
+  int i = 10000;
+  while (i-- >= 0)
+  {
+    barrier ();
+    if (i == 0)
+      printf ("LOOP FINIHSED.\n");
+  }
+
   /* Greet user. */
   printf ("Pintos booting with %'"PRIu32" kB RAM...\n",
           init_ram_pages * PGSIZE / 1024);
