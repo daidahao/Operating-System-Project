@@ -10,7 +10,7 @@ Zhihao Dai <11510415@mail.sustc.edu.cn>
 
 Task1 implementation, task2 and task3 design and implementation.
 
-###1. Design Document
+### 1. Design Document
 
 In this part, we will discuss the plan for each tasks' implementation, including requirements, implementations, algorithms and so on.
 
@@ -27,7 +27,7 @@ In this part, we will discuss the plan for each tasks' implementation, including
 - `threads/thread.h`
   - `struct thread`: Add `process_file` to pointer to the file to load.
 
-#####1.1.2 Algorithms
+##### 1.1.2 Algorithms
 
 We quickly review the **original implementation** in Pintos and describe **new implementation** in this part.    
 
@@ -55,7 +55,7 @@ Function `push_stack(esp,argc,argv)` push these elements as the figure 1 shows, 
 
 <center>Figure 1 push_stack </center>
 
-#####1.3 Synchronization
+##### 1.3 Synchronization
 
 When we load the user program, we should load the process's file. Since, the file system in Pintos is not thread-safe, we should use `filesys_lock` to keep the process's file from being modified while opening it. Once, the file is loaded successfully, we should use this lock agian to deny wirte to the file using `file_deny_write`.
 
@@ -225,7 +225,7 @@ This function is to return the size of the file. Firslt, we get the index/file d
 
 Finally, we call `file_length` to get and return the file's size.
 
-#####1.3.2.5 Function `_read(void *esp)`
+##### 1.3.2.5 Function `_read(void *esp)`
 
 At this time, we need 3 arguments from the stack using the function `pop3(void *esp, uint32_t *a1, uint32_t *a2, uint32_t *a3)`. The first argument is file descriptor, buffer and size. Firstly, we call `is_user_vaddr (const void *vaddr) ` in `threads/varr.h `to check whether buffer is valid user address. If not, exit the thread with `status` -1. There are several case according to different valuse of file descriptor.
 
@@ -239,7 +239,7 @@ Similar with the function `_read`, we need 3 arguments from the stack, `int fd`,
 - `if fd==1`: It means that we should write to the console. We call `putbuf(const char *buffer, size_t n)` in `lib/kernel/console.c` to do that.
 - `else`: We write to the corresponding file using `file_write(struct file *file, void *buffer, off_t size)` in `filesys/file.c`.  Before that ,we check the validity of `fd`. Finally, we return `bytes_written`.
 
-#####1.3.2.7 Function `_seek(void *esp)`
+##### 1.3.2.7 Function `_seek(void *esp)`
 
 We need two arguments in this function, `int fd` and `unsigned position`. We check the validity and then call `file_seek(struct file *file, off_t new_pos)` to change the file's next byte to be read or written position.
 
@@ -251,7 +251,7 @@ We only need one argument now, `int fd`. We check the validity and then call `fi
 
 To colose some file, we only need one argument, `int fd`. Check the validity and find the file. Eventually, call `file_close(struct file *file)` to colse it.
 
-#####1.3.2.10 More implementations  
+##### 1.3.2.10 More implementations  
 
 Apart from the modifications above, we also need to change other codes in Pintos to run it. 
 
@@ -298,7 +298,7 @@ Hence, we write down a test case to test it. In this test case, we call system c
 
 In this project, it requires us to submit 2 new test cases, which exercise functionality that is not covered by existing tests. In this part, we will dicuss 2 new test cases in more detail.
 
-####2.1 `tests/userprog/open-many.c` and `tests/userprog/open-many.ck`
+#### 2.1 `tests/userprog/open-many.c` and `tests/userprog/open-many.ck`
 
 ##### 2.1.1 Description of the Feature
 
