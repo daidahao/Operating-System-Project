@@ -310,11 +310,11 @@ In a single process, we open (calling syscall `open(file_name)`) 5 files each ti
 
 ##### 2.1.3 Output
 
-![open_many1](/Users/wu/Documents/Third_year/OS/Project/project2/open_many1.png)
+![open_many1](open_many1.png)
 
 <center>Figure 4 Open Many Output 1</center>
 
-![open-many2](/Users/wu/Documents/Third_year/OS/Project/project2/open-many2.png)
+![open-many2](open-many2.png)
 
 <center>Figure 5 Open Many Output 2</center>
 
