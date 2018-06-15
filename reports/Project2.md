@@ -357,7 +357,7 @@ A parent should be able to repeat this process as many as times as it wants, bei
 
 Zhihao Dai is responsible for implementing task1, designing and implementing task2 and task3 and test cases. Jingrou Wu is responsible for understanding the userprog part in Pintos, design and implementing task1, designing task2 and task3, fixing bugs and writing the report.
 
-####3.2 What went well and wrong 
+#### 3.2 What went well and wrong 
 
 We pass all the 76 (offered by Pintos) + 3 (Two above and one is for system call `practice`)tests. 
 
