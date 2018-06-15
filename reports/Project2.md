@@ -35,11 +35,11 @@ We quickly review the **original implementation** in Pintos and describe **new i
 
 In the user program part, after the kernel is excuted, a new thread to load user program is created with the function `start_process(void *filename)` . Then it Initializes interrupt frame and loads executable file according to the `filename`. After that, it starts the user process by simulating a return from an interrupt, implemented by `intr_exit` which push all arguments to the stack stored in the struct `intr_frame`.
 
-##### 1.1.1.2 New Implementation
+##### 1.1.2.2 New Implementation
 
 Based on the understanding about how the user program is excuted, we modify the code by 2 steps.
 
-###### 1.1.1.2.1 Argument Parse(`userprog/process.c`)
+###### 1.1.2.2.1 Argument Parse(`userprog/process.c`)
 
 Since the argument `filename` including the excutable file and the arguments, we need to split them. In the pintos's `lib`, the function, `strtok_r(char *,const char *,char **)`, used to split string is included in the c file `string.c`. Using it, we could get the actual excutable file's name which is used to name the new user process.
 
@@ -47,7 +47,7 @@ In the function `start_process(void *file_name)`, after initialization, the excu
 
 In the function `load`, we split the command line arguments and store it in the `char* argv[]`. Then, push these arguments into the stack using the newlly created function `push_stack(esp,argc,argv)`. 
 
-###### 1.1.1.2.2 Push arguments into the stack(`userprog/process.c`)
+###### 1.1.2.2.2 Push arguments into the stack(`userprog/process.c`)
 
 Function `push_stack(esp,argc,argv)` push these elements as the figure 1 shows, where `esp` is the stack point, `argc` is the total number of arguments and `argv` stores all the arguments.
 
