@@ -603,28 +603,29 @@ In the current version, there is no obvious problems with memory safety, memory 
   - This is the major problem during testing, since once it happens, the output will be very different and confused.
   - **Solution**: Whenever there is a file operator, we add lock to ensure thread-safe. We also deny writting while the excutable file is running to avoid thread choas.
 
+
+  - Did you use consistent code style? Is your code simple and easy to understand? If you have very complex sections of code in your solution, did you add enough comments to explain
+  them?
+
+    Our code is consistent with the exisiting Pintos code style and easy to understand. For those codes a little difficult for understanding, we add enough comments to explain them.
+
+  - Did you leave commented-out code in your final submission?
+
+      No.
+
+  - Did you copy-paste code instead of creating reusable functions?
+
+    In this project, instead of re-implementing linked list algorithms, we using them directly.
+
+  - Did you re-implement linked list algorithms instead of using the provided list manipulation?
+
+    We try to create as many as reusable functions (e.g. `pop1()`, `pop2()`, `pop3()` in `userprog/syscall.c` to pop 1, 2, 3 arguments off the stack) as possible to keep our code short and tidy.
+
+  - Are your lines of source code excessively long? (more than 100 characters)?
+
+    We try to keep our lines of code as short as possible. If there are excessively long lines, we may divide them into several lines.
+
 ### 5. Conclusion
-
-- Did you use consistent code style? Is your code simple and easy to understand? If you have very complex sections of code in your solution, did you add enough comments to explain
-them?
-
-  Our code is consistent with the exisiting Pintos code style and easy to understand. For those codes a little difficult for understanding, we add enough comments to explain them.
-
-- Did you leave commented-out code in your final submission?
-
-    No.
-
-- Did you copy-paste code instead of creating reusable functions?
-
-  In this project, instead of re-implementing linked list algorithms, we using them directly.
-
-- Did you re-implement linked list algorithms instead of using the provided list manipulation?
-
-  We try to create as many as reusable functions (e.g. `pop1()`, `pop2()`, `pop3()` in `userprog/syscall.c` to pop 1, 2, 3 arguments off the stack) as possible to keep our code short and tidy.
-
-- Are your lines of source code excessively long? (more than 100 characters)?
-
-  We try to keep our lines of code as short as possible. If there are excessively long lines, we may divide them into several lines.
 
 Through this project, we have learnt the real-world implementations to system calls in Pintos and how to synchronize between different processes.
 
