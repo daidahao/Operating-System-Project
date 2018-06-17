@@ -174,13 +174,14 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  /* If load failed, quit. */
   palloc_free_page (file_name);
 
+  /* Write `bool success` into `bool loaded`. */
   struct thread *current_thread = thread_current ();
   current_thread->loaded = success;
   sema_up (&(current_thread->loaded_sema));
 
+  /* If load failed, quit. */
   if (!success)
   {
     process_thread_exit (-1);
