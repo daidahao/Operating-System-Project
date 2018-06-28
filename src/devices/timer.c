@@ -7,9 +7,6 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-
-/* For time_sleep() */
-#include <stdbool.h>
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -33,77 +30,6 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
-/* For time_sleep() */
-static bool sleep_less (const struct list_elem *a, const struct list_elem *b, void *aux);
-static int64_t get_wakeup_tick (const struct list_elem *e);
-static void wakeup (void *);
-
-/* Variables Introduced by Project 1 */
-
-/* Task 1: Efficient Alarm Clock */
-static struct list sleep_list;			/* List of sleeping threads. */
-static struct lock sleep_list_lock;		/* Lock for SLEEP_LIST. */
-static int64_t next_wakeup_tick;		/* Most recent tick to wake up any thread. */
-static struct semaphore sleep_sema;		/* Semaphore for WAKEUP thread. */
-
-/* WAKEUP thread for time_sleep().
-   Wake up all threads that needs to be woken up in SLEEP_LIST. */
-static void
-wakeup (void * v UNUSED)
-{
-  while (1)
-  {
-    sema_down (&sleep_sema);
-    sema_up(&sleep_sema);
-
-    /* Make sure WAKEUP thread is always at highest priority. */
-    thread_set_priority (PRI_MAX);
-
-    int64_t now = timer_ticks ();
-    struct list_elem *e;
-    /* Acquire LOCK to access and modify SLEEP_LIST. */
-    lock_acquire (&sleep_list_lock);
-
-    /* Wake up all threads with WAKEUP_TICK smaller than NOW by 
-       unblocking and remove them from SLEEP_LIST. */
-    /* Since the SLEEP_LIST is already sorted, we don't need to sort it anymore. */
-    for (e = list_begin (&sleep_list); e != list_end (&sleep_list);)
-    {
-	    if (get_wakeup_tick (e) <= now)
-	    {
-	        struct thread *t = list_entry (e, struct thread, sleep_elem);
-	        if (t->status != THREAD_BLOCKED)
-	    		break;
-	        thread_unblock (t);
-	        e = list_remove (e);
-	    }
-	    else
-	    	break;
-    }
-
-    /* If SLEEP_LIST is empty, WAKEUP will not be unblocked. 
-       Otherwise, set NEXT_WAKEUP_TICK to most recent tick to wake up. */
-    if (list_empty (&sleep_list))
-      next_wakeup_tick = INT64_MAX;
-    else
-      next_wakeup_tick = get_wakeup_tick (list_front (&sleep_list));
-
-    lock_release (&sleep_list_lock);
-    sema_down (&sleep_sema);
-  }
-
-}
-
-/* Less compare function for linked list. 
-   Return true if thread A's WAKEUP_TICK is smaller than B's. */
-bool
-sleep_less (const struct list_elem *a,
-                             const struct list_elem *b,
-                             void *aux UNUSED) 
-{
-  return (get_wakeup_tick (a) < get_wakeup_tick (b));
-}
-
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -111,65 +37,6 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-
-  /* Task 1: Efficient Alarm Clock */
-  /* Initialize variables. */
-  list_init (&sleep_list);
-  lock_init (&sleep_list_lock);
-  next_wakeup_tick = INT64_MAX;
-  sema_init (&sleep_sema, 0);
-
-  /* Create a WAKEUP thread to wake up sleeping threads when needed. */
-  thread_create ("WAKEUP", PRI_MAX, wakeup, NULL);
-}
-
-/* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. In Task 1, we change timer_sleep() so that it no
-   longer implements busy waiting. 
-   Instead, it will insert the current thread into SLEEP_LIST. When 
-   the wake up time comes, a thread named WAKEUP will be unblocked 
-   and unblock the sleeping thread. */
-void
-timer_sleep (int64_t ticks) 
-{
-  int64_t start = timer_ticks ();
-
-  ASSERT (intr_get_level () == INTR_ON);
-
-  /* Return immediately if TICKS is non-positive. */
-  if (ticks <= 0)
-    return;
-
-  struct thread* current_thread = thread_current ();
-  current_thread->wakeup_tick = start + ticks;
-
-  /* Acquire LOCK for SLEEP_LIST. */
-  lock_acquire (&sleep_list_lock);
-  /* Insert current thread into SLEEP_LIST in order. */
-  list_insert_ordered (&sleep_list, &(current_thread->sleep_elem), 
-  				sleep_less, NULL);
-  /* Calculate new value for NEXT_WAKEUP_TICK. */
-  next_wakeup_tick = get_wakeup_tick(list_front(&sleep_list));
-  /* Release LOCK for SLEEP_LIST. */
-  lock_release (&sleep_list_lock);
-
-  /* Block the current thread. */
-  intr_disable ();
-  thread_block ();
-  intr_enable ();
-}
-
-/* Timer interrupt handler. */
-static void
-timer_interrupt (struct intr_frame *args UNUSED)
-{
-  ticks++;
-  thread_tick ();
-
-  /* Only call sema_up() when NEXT_WAKEUP_TICK comes. */
-  /* Because of pre-computation, it's more efficient and has less delay. */
-  if (ticks >= next_wakeup_tick && sleep_sema.value==0)
-    sema_up (&sleep_sema);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -217,11 +84,16 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/* Get thread's WAKEUP_TICK by its SLEEP_ELEM. */
-int64_t
-get_wakeup_tick (const struct list_elem *e) 
+/* Sleeps for approximately TICKS timer ticks.  Interrupts must
+   be turned on. */
+void
+timer_sleep (int64_t ticks) 
 {
-  return list_entry (e, struct thread, sleep_elem)->wakeup_tick;
+  int64_t start = timer_ticks ();
+
+  ASSERT (intr_get_level () == INTR_ON);
+  while (timer_elapsed (start) < ticks) 
+    thread_yield ();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -292,6 +164,14 @@ void
 timer_print_stats (void) 
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
+}
+
+/* Timer interrupt handler. */
+static void
+timer_interrupt (struct intr_frame *args UNUSED)
+{
+  ticks++;
+  thread_tick ();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

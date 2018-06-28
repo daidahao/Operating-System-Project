@@ -128,7 +128,7 @@ main (void)
 #endif
 
   printf ("Boot complete.\n");
-
+  
   /* Run actions specified on kernel command line. */
   run_actions (argv);
 
@@ -240,12 +240,6 @@ parse_options (char **argv)
         shutdown_configure (SHUTDOWN_POWER_OFF);
       else if (!strcmp (name, "-r"))
         shutdown_configure (SHUTDOWN_REBOOT);
-      else if (!strcmp (name, "-b"))
-      {
-        /* A new argument -b can specify whether PINTOS run
-           without decreasing threads' (except main) priorities. */
-        berkeley_style = true;
-      }
 #ifdef FILESYS
       else if (!strcmp (name, "-f"))
         format_filesys = true;
@@ -261,8 +255,7 @@ parse_options (char **argv)
       else if (!strcmp (name, "-rs"))
         random_init (atoi (value));
       else if (!strcmp (name, "-mlfqs"))
-        PANIC("does not support mlfqs");
-        // thread_mlfqs = true;
+        thread_mlfqs = true;
 #ifdef USERPROG
       else if (!strcmp (name, "-ul"))
         user_page_limit = atoi (value);

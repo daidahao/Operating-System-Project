@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -23,6 +24,9 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+/* Opened files descriptors. */
+#define MAX_OPENED_FILES 128
 
 /* A kernel thread or user process.
 
@@ -87,80 +91,101 @@ struct thread
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
-    int priority;                       /* (Effective) Priority. */
+    int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-
-    /* Members Introduced in Project 1 */
-
-    /* Task 1: timer_sleep() */
-    int64_t wakeup_tick;                /* Wakt up tick. */
-    struct list_elem sleep_elem;        /* List element for sleep list. */
-
-    /* Task 2: Round Robin */
-    unsigned time_slice;                /* Time slice.*/
-
-    /* Task 3: Priority Scheduler */
-    struct lock *blocked_lock;          /* Lock that blocks the thread. */
-    struct list donations;              /* List of donations received. */
-    int ori_priority;                   /* Original priority before any donation. */
-    bool donated;                       /* Receive donation or not. */
-
-
-
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    /*  Introduced children_list, processs_ptr for wait() & exit() system calls.
+        To see how they are actually used, check init_thread() in threads/thread.c
+        and process_execute(), process_wait(), process_thread_exit() in 
+        userprog/process.c. */
+    /*  When the parent calls process_execute(), it dynamically allocates a "struct 
+        child_process" for the child, which is supoosed to store the exit status of the
+        child (see "struct child_process" below for more details) and points child's
+        process_ptr to this info. */
+    /*  Important Notes: When the parent exits, it must clean up all the memory allocated
+        for each "struct child_process" in children_list. */
+    struct list children_list;          /* List of children process. */
+    struct child_process *process_ptr;  /* Pointer to the process's information. */
+    /*  Introduced loaded_sema, loaded for exec() system call.
+        To see how they are actually used, check init_thread() in threads/thread.c
+        and start_process() in userprog/process.c and _exec() in userprog/syscall.c. */
+    /*  When the parent calls exec() system call, it calls process_execute(), essentially,
+        start_process() first, then downs the semaphore of the child process. Once the 
+        child process finish loading, its load result is saved into loaded and loaded_sema 
+        is upped, thus waking up the parent in exec(). */
+    struct semaphore loaded_sema;       /* Semaphore for load. */
+    bool loaded;                        /* Whether the process is successfully loaded. */
+    /*  Introduced opened_files for File System Calls, which is an array for 
+        storing File Descriptors. It will not been allocated memory until the first time
+        _open() is called. 
+        See _open(), _write(), _close() in userprog/syscall.c for more deatils. */
+    /*  Important Notes: When the process exits, it must make sure that it cleans up the
+        memory allocated for opened_files. */
+    struct file **opened_files;         /* Array of currently opened files. */
+    /*  To ensure that when the process is running, its executable cannot be
+        modified, we save the pointer to the file into process_file.
+        When the process starts, the process denies write access using 
+        file_deny_write(). Check out load() in userprog/process.c.
+        When the process exits, the process allows write access using 
+        file_allow_write(). Check  out process_thread_exit() in userprog/process.c. */
+    /*  Notice that executable could still be not writable if there is another
+        process of the same executable running. */
+    struct file *process_file;          /* The executable file of the process. */
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
 
+#ifdef USERPROG
+/*  Info of the child process.
+
+    To implement process_wait(), we introduce this structure.
+
+    On one hand, it has a "struct list_elem" for inserting itself
+    into the parent's children_list. Thus, the parent can access its
+    status (waited, exit_status, etc..) easily.
+
+    On the other hand, the corresponding child process has a pointer 
+    named "process_ptr" to this structure. Therefore, the child process
+    can safely save its exit status into this structure without worrying
+    it might get lost when all the resouces of the process is freed.
+
+    The initail value of "semaphore" is 0. When the child process is being 
+    waited, that is, process_wait() is called on the child, the parent downs 
+    the semaphore. When the child process exits, process_thread_wait() is 
+    called and the semaphore is upped. Then, the parent waiting for the child
+    would wake up and can retrieve the child's exit status now. */
+struct child_process
+{
+  struct list_elem children_elem; /* List element for list of children of the process. */
+  tid_t tid;                      /* Child process's tid. */
+  struct semaphore semaphore;     /* Semaphore. */
+  bool waited;                    /* Whether the child process has been waited for. */
+  struct thread *thread;          /* Pointer to the child thread. */
+  int exit_status;                /* Exit status. */
+};
+#endif
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
-
-/* Variables Introduced in Project 1 */
-
-/* Task 3: Priority Scheduler */
-/* If false (default), priority of each thread (except main thread)
-   will decrease by 3 after each time slice until it becomes zero.
-   If true, priority of each thread will not decrease over time,
-   unless there is a donation or request by the thread itself.
-*/
-bool berkeley_style;
-/* Main thread's tid. We store this because we need to identify 
-   main thread in thread_tick() and make sure that if berkeley_style 
-   is true, its priority will not decrease overtime. */
-tid_t main_tid;
-
-
-
-/* Functions Introduced in Project 1 */
-/* See thread.c for more deatils. */
-
-/* Task 2: Round Robin */
-unsigned thread_get_time_slice (void);
-
-/* Task 3: Priority Scheduler */
-void set_blocked_lock (struct lock *);
-void donate_priority(struct lock *);
-void undo_donate_priority (struct lock *);
-bool thread_cmp_by_priority (const struct list_elem *, const struct list_elem *, void * UNUSED);
-bool priority_cmp (const struct thread *, const struct thread *);
-
-
+void thread_init (void);
 void thread_start (void);
 
+void thread_tick (void);
 void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
+tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
@@ -184,10 +209,6 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-/* Functions Modified in Project 1 */
-void thread_init (void);
-void thread_tick (void);
-tid_t thread_create (const char *name, int priority, thread_func *, void *);
-
+struct thread *thread_find (tid_t);
 
 #endif /* threads/thread.h */

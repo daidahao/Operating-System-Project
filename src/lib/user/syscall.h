@@ -33,6 +33,7 @@ int write (int fd, const void *buffer, unsigned length);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
+int practice (int i);
 
 /* Project 3 and optionally project 4. */
 mapid_t mmap (int fd, void *addr);

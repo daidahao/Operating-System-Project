@@ -141,6 +141,12 @@ close (int fd)
   syscall1 (SYS_CLOSE, fd);
 }
 
+int
+practice (int i)
+{
+  return syscall1 (SYS_PRACTICE, i);
+}
+
 mapid_t
 mmap (int fd, void *addr)
 {

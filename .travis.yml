@@ -1,0 +1,15 @@
+sudo: required
+dist: trusty
+before_install:
+  - source ./install.sh
+script:
+- cd src/utils
+- make clean
+- make
+- cd ../../
+- cd src/userprog
+- make clean
+- make check
+after_failure:
+- cat build/tests/userprog/rox-multichild.output
+- cat build/tests/userprog/rox-multichild.result

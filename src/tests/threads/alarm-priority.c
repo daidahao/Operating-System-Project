@@ -19,8 +19,8 @@ test_alarm_priority (void)
     ASSERT (!thread_mlfqs);
     
     sema_init (&wait_sema, 0);
-    int i = 0;
     
+    int i;
     for (i = 0; i < 10; i++)
     {
         int priority = PRI_DEFAULT - (i + 5) % 10 - 1;
